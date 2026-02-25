@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC Access Control</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="auth.js"></script>
+    <script src="dashboard.js"></script>
+</head>
+<body>
+
+    <div id="login-screen" class="full-screen-center">
+        <div class="login-card">
+            <div class="card-header">
+                <h1>NFC Admin</h1>
+                <p>Chuka University Access Control</p>
+            </div>
+            
+            <form id="login-form" onsubmit="attemptLogin(); return false;">
+                <div class="input-group">
+                    <label>Admin Email</label>
+                    <input type="email" id="email" required placeholder="admin@254.ac.ke">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="primary-btn">Unlock System</button>
+            </form>
+            <p id="error-msg" class="error-text">Access Denied: Invalid Credentials</p>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="dashboard-layout hidden">
+        <aside class="sidebar">
+            <h2 class="logo">NFC Secure</h2>
+            <nav>
+                <a href="#" class="nav-item active">Live Monitor</a>
+                <a href="#" class="nav-item">User Management</a>
+                <button onclick="handleLogout()" class="logout-btn">Logout</button>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h2 id="dashboard-title">Live Activity Feed</h2>
+                <div class="status-indicator">
+                    <span class="dot pulse"></span> System Online
+                </div>
+            </header>
+
+            <div id="live-monitor-section">
+                <div class="action-header">
+                    <button id="enroll-btn" class="secondary-btn">Enroll New User</button>
+                </div>
+
+                <div id="enroll-modal" class="modal-overlay hidden">
+                    <div class="modal-content">
+                        <h3>User Enrollment</h3>
+                        <p>Enter details and tap the new tag on the reader.</p>
+                        <form id="enroll-form">
+                            <input type="text" id="new-user-name" placeholder="Full Name" required>
+                            <input type="text" id="new-user-id" placeholder="Student/Staff ID" required>
+                            <div class="uid-waiting-box">
+                                <span id="uid-status">Waiting for NFC Scan...</span>
+                                <input type="text" id="captured-uid" readonly placeholder="UID will appear here">
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" onclick="closeEnrollModal()" class="cancel-btn">Cancel</button>
+                                <button type="submit" class="primary-btn">Save User</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <section class="table-container">
+                    <table id="activity-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>User Name</th>
+                                <th>Timestamp</th>
+                                <th>Access Point</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table">
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+            <div id="user-management-section" class="hidden">
+                <section class="table-container">
+                    <h2>User Management</h2>
+                    <table id="user-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>UID</th>
+                                <th>Status</th>
+                                <th>Last Access</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-table-body">
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+        </main>
+            </section>
+        </main>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>
