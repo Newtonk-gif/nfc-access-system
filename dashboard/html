@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firebase DB Test</title>
+</head>
+<body>
+  <h2>Firebase Connection Test</h2>
+  <button onclick="testWrite()">Write Test Log</button>
+  <button onclick="testRead()">Read Logs</button>
+  <button onclick="testFirestore()">Read Firestore Users</button>
+  <div id="output" style="margin-top:20px; font-family:monospace; white-space:pre"></div>
+
+<script type="module">
+  import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, push,
+           onChildAdded, get }       from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  import { getFirestore, collection,
+           getDocs }                 from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyB-DK6trmKoPfbUvrCBTfzonLWh4dU_N28",
+    authDomain:        "attendance-logging-syste-5540c.firebaseapp.com",
+    databaseURL:       "https://attendance-logging-syste-5540c-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId:         "attendance-logging-syste-5540c",
+    storageBucket:     "attendance-logging-syste-5540c.firebasestorage.app",
+    messagingSenderId: "685548152341",
+    appId:             "1:685548152341:web:e5eb89e21018f3e316901c"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const rtdb = getDatabase(app);
+  const fdb  = getFirestore(app);
+  const auth = getAuth(app);
+
+  const log = (msg) => {
+    document.getElementById('output').textContent += msg + '\n';
+  }
+
+  // Sign in first
+  signInAnonymously(auth).then(() => {
+    log('✅ Signed in anonymously');
+  }).catch(e => log('❌ Auth failed: ' + e.message));
+
+  // Test 1 — Write a log entry to Realtime DB
+  window.testWrite = async () => {
+    try {
+      const newRef = await push(ref(rtdb, 'logs'), {
+        tagUid:     'TESTABCD',
+        readerId:   'reader_01',
+        eventType:  'entry',
+        timestamp:  Date.now(),
+        status:     'granted',
+        userName:   'Test User',
+        role:       'student',
+        department: 'Computer Science',
+        location:   'Building A'
+      });
+      log('✅ Write successful — push ID: ' + newRef.key);
+    } catch(e) {
+      log('❌ Write failed: ' + e.message);
+    }
+  };
+
+  // Test 2 — Read logs from Realtime DB
+  window.testRead = async () => {
+    try {
+      const snapshot = await get(ref(rtdb, 'logs'));
+      if (snapshot.exists()) {
+        log('✅ Read successful — total log entries: ' + Object.keys(snapshot.val()).length);
+        const entries = Object.values(snapshot.val());
+        entries.slice(-3).forEach(e => {
+          log('   → ' + e.userName + ' | ' + e.eventType + ' | ' + e.location);
+        });
+      } else {
+        log('⚠️  No logs found');
+      }
+    } catch(e) {
+      log('❌ Read failed: ' + e.message);
+    }
+  };
+
+  // Test 3 — Read users from Firestore
+  window.testFirestore = async () => {
+    try {
+      const snapshot = await getDocs(collection(fdb, 'users'));
+      log('✅ Firestore read successful — total users: ' + snapshot.size);
+      snapshot.docs.forEach(doc => {
+        const u = doc.data();
+        log('   → ' + u.name + ' | ' + u.role + ' | ' + u.department);
+      });
+    } catch(e) {
+      log('❌ Firestore read failed: ' + e.message);
+    }
+  };
+</script>
+</body>
+</html>
+```
+
+Open it in your browser and click each button. You should see:
+```
+✅ Signed in anonymously
+✅ Write successful — push ID: -NxK8aB2cD3eF...
+✅ Read successful — total log entries: 4
+   → Alice Mwangi | entry | Building A
+   → Brian Otieno | entry | Building A
+   ...
+✅ Firestore read successful — total users: 4
+   → Alice Mwangi | student | Computer Science
+   ...
