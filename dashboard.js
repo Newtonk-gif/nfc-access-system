@@ -58,10 +58,16 @@ function initDashboard() {
 
 // Fetch users from API and render table
 function fetchAndRenderUsers() {
-    fetch('/users')
+    fetch('/api/users') // point at backend API
         .then(res => res.json())
-        .then(users => {
-            renderUserTable(users);
+        .then(response => {
+            if (response.success && response.data) {
+                // convert object to array if necessary
+                const users = Array.isArray(response.data) ? response.data : Object.values(response.data);
+                renderUserTable(users);
+            } else {
+                throw new Error(response.error || 'Unexpected response');
+            }
         })
         .catch(err => {
             userTableBody.innerHTML = '<tr><td colspan="5">Failed to load users</td></tr>';
@@ -144,9 +150,26 @@ function handleEnrollSubmit(e) {
         return;
     }
 
-    console.log("Saving to Database:", userData);
-    alert(`Success: ${userData.name} has been allocated UID ${userData.uid}`);
-    closeEnrollModal();
+    // send to backend API
+    fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userData.id, name: userData.name, uid: userData.uid })
+    })
+    .then(res => res.json())
+    .then(response => {
+        if (response.success) {
+            alert(`Success: ${userData.name} has been allocated UID ${userData.uid}`);
+            fetchAndRenderUsers(); // refresh user list
+        } else {
+            throw new Error(response.error || 'Failed to save user');
+        }
+    })
+    .catch(err => {
+        console.error('Error saving user:', err);
+        alert('Failed to save user. See console for details.');
+    })
+    .finally(() => closeEnrollModal());
 }
 
 // --- Live Feed Functions ---
