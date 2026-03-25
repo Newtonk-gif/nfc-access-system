@@ -48,19 +48,25 @@ app.get('/api/users/:userId', async (req, res) => {
  */
 app.post('/api/users', async (req, res) => {
   try {
-    const { userId, email, name, role } = req.body;
+    const { userId, email, name, role, uid } = req.body;
     
-    if (!userId || !email || !name) {
+    if (!userId || !name) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
     const result = await databaseHandler.createUser(userId, {
-      email,
+      email: email || '',
       name,
+      uid: uid || '',
       role: role || 'user',
       active: true
     });
     
+    // Register the tag if a UID was provided
+    if (uid) {
+      await databaseHandler.registerNFCTag(uid, userId);
+    }
+
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -207,4 +213,7 @@ app.listen(PORT, () => {
   console.log(`🚀 NFC Access Control Server running on port ${PORT}`);
   console.log(`📊 Access logs: http://localhost:${PORT}/api/access-logs`);
   console.log(`👥 Users: http://localhost:${PORT}/api/users`);
+
+  // Monitor Firebase Connection
+  databaseHandler.checkConnection();
 });

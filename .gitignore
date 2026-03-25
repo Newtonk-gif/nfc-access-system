@@ -1,0 +1,6 @@
+# Dependencies
+node_modules/
+
+# Secrets and Environment Variables
+serviceAccountKey.json
+.env

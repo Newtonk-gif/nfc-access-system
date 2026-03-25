@@ -3,6 +3,9 @@ let enrollModal, enrollBtn, enrollForm, capturedUidInput, uidStatus, logTable;
 let userTableBody;
 let userManagementSection, liveMonitorSection;
 
+// Backend API URL (Update the port if your Node server runs on a different one)
+const API_BASE_URL = 'http://localhost:3000';
+
 function initDashboard() {
     console.log("Dashboard has been initialized.");
     
@@ -32,15 +35,14 @@ function initDashboard() {
                 userManagementSection.classList.add('hidden');
                 liveMonitorSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'Live Activity Feed';
+                fetchAndRenderLogs();
             }
         });
     });
     
-    // Start the pulse animation
-    const dot = document.querySelector('.dot');
-    if (dot) {
-        dot.classList.add('pulse');
-    }
+    // Check if the backend server is running and update UI
+    checkServerStatus();
+    setInterval(checkServerStatus, 15000); // Re-check every 15 seconds
     
     // Setup event listeners
     if (enrollBtn) {
@@ -53,12 +55,33 @@ function initDashboard() {
     if (enrollForm) {
         enrollForm.addEventListener('submit', handleEnrollSubmit);
     }
+
+    // Load access logs initially to display existing scan history
+    fetchAndRenderLogs();
     console.log("Dashboard event listeners initialized");
+}
+
+// Ping the backend health endpoint to verify it is running
+function checkServerStatus() {
+    const statusIndicator = document.querySelector('.status-indicator');
+    if (!statusIndicator) return;
+
+    fetch(`${API_BASE_URL}/health`)
+        .then(res => {
+            if (res.ok) {
+                statusIndicator.innerHTML = '<span class="dot pulse" style="background-color: #22c55e;"></span> System Online';
+            } else {
+                throw new Error('Server returned an error');
+            }
+        })
+        .catch(err => {
+            statusIndicator.innerHTML = '<span class="dot" style="background-color: #ef4444; animation: none;"></span> Backend Offline';
+        });
 }
 
 // Fetch users from API and render table
 function fetchAndRenderUsers() {
-    fetch('/api/users') // point at backend API
+    fetch(`${API_BASE_URL}/api/users`) // point at backend API
         .then(res => res.json())
         .then(response => {
             if (response.success && response.data) {
@@ -86,8 +109,8 @@ function renderUserTable(users) {
         row.innerHTML = `
             <td>${user.id}</td>
             <td>${user.name}</td>
-            <td>${user.uid}</td>
-            <td>${user.status}</td>
+            <td>${user.uid || 'No UID'}</td>
+            <td>${user.active ? 'Active' : 'Inactive'}</td>
             <td>${user.last_access || ''}</td>
         `;
         userTableBody.appendChild(row);
@@ -151,7 +174,7 @@ function handleEnrollSubmit(e) {
     }
 
     // send to backend API
-    fetch('/api/users', {
+    fetch(`${API_BASE_URL}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userData.id, name: userData.name, uid: userData.uid })
@@ -188,12 +211,84 @@ function addLogEntry(status, user, time, area) {
     row.innerHTML = `
         <td><span class="${statusClass}">${status}</span></td>
         <td>${user}</td>
-        <td>${time}</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
         <td>${area}</td>
+        <td>-</td>
+        <td>${time}</td>
     `;
 
     // Prepend ensures the newest scan is always at the top
     logTable.prepend(row);
+}
+
+// Fetch access logs from the database
+function fetchAndRenderLogs() {
+    if (!logTable) {
+        console.error("Dashboard Error: Could not find 'log-table' in your HTML.");
+        return;
+    }
+    
+    fetch(`${API_BASE_URL}/api/access-logs`)
+        .then(res => res.json())
+        .then(response => {
+            console.log("Backend API Response (Logs):", response);
+            if (response.success && response.data) {
+                // Ensure data is an array before looping
+                const logs = Array.isArray(response.data) ? response.data : Object.values(response.data);
+                renderLogsTable(logs);
+            } else {
+                console.warn("Backend returned empty data or failed:", response);
+                renderLogsTable([]); // Render empty state
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching logs. Is the backend running? Details:', err);
+            logTable.innerHTML = '<tr><td colspan="9" class="text-center text-red-500 font-bold">Failed to load data from backend. Check console.</td></tr>';
+        });
+}
+
+function renderLogsTable(logs) {
+    logTable.innerHTML = '';
+
+    // Display a friendly message if there is no data
+    if (!logs || logs.length === 0) {
+        logTable.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 1rem;">No recent activity found.</td></tr>';
+        return;
+    }
+
+    // Response is newest-first. Appending them preserves the order.
+    logs.forEach(log => {
+        // Handle timestamp (supports both integer milliseconds and ISO strings)
+        const time = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'N/A';
+        
+        // Handle status mapping (supports your 'status' string or boolean 'granted')
+        let isGranted = log.granted === true;
+        if (log.status) {
+            isGranted = log.status.toLowerCase() === 'granted';
+        }
+        const status = isGranted ? "GRANTED" : "DENIED";
+        const statusClass = isGranted ? "text-green-600 font-bold" : "text-red-600 font-bold";
+        
+        // Display Name (uses your userName, falls back to userId, then tagUid)
+        const userDisplay = log.userName || log.userId || 'Unknown';
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><span class="${statusClass}">${status}</span></td>
+            <td>${userDisplay}</td>
+            <td style="text-transform: capitalize;">${log.role || 'N/A'}</td>
+            <td>${log.department || 'N/A'}</td>
+            <td style="font-family: monospace;">${log.tagUid || log.tagUID || 'N/A'}</td>
+            <td style="text-transform: capitalize;">${log.eventType || 'N/A'}</td>
+            <td>${log.location || 'Unknown'}</td>
+            <td>${log.readerId || 'N/A'}</td>
+            <td>${time}</td>
+        `;
+        logTable.appendChild(row);
+    });
 }
 
 // Simulate NFC scan for testing - scan after dashboard loads

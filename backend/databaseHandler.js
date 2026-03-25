@@ -50,9 +50,14 @@ class DatabaseHandler {
     try {
       const snapshot = await db.ref('users').get();
       if (snapshot.exists()) {
-        return snapshot.val();
+        const users = snapshot.val();
+        // Map the Firebase object keys to an 'id' field for the frontend
+        return Object.keys(users).map(key => ({
+          id: key,
+          ...users[key]
+        }));
       } else {
-        return {};
+        return [];
       }
     } catch (error) {
       console.error('Error fetching all users:', error);
@@ -202,7 +207,7 @@ class DatabaseHandler {
       }
 
       // Create log entry with auto-generated ID
-      const newLogRef = db.ref('access_logs').push();
+      const newLogRef = db.ref('logs').push();
       await newLogRef.set(logEntry);
 
       console.log(`Access event logged - Tag: ${tagUID}, Location: ${location}, Granted: ${granted}`);
@@ -219,13 +224,23 @@ class DatabaseHandler {
    */
   async getAccessLogs(limit = 50) {
     try {
-      const snapshot = await db.ref('access_logs')
-        .orderByChild('timestamp')
-        .limitToLast(limit)
-        .get();
+      // Fetch all logs first to bypass strict Firebase indexing/type mismatches
+      const snapshot = await db.ref('logs').get();
+
+      console.log('\n--- BACKEND DB CHECK ---');
+      console.log(`Checking path "/logs". Did it find anything? ${snapshot.exists()}`);
+      console.log('Raw Data returned:', snapshot.val());
+      console.log('------------------------\n');
 
       if (snapshot.exists()) {
-        return Object.values(snapshot.val()).reverse();
+        let logsArray = Object.values(snapshot.val());
+        // Sort descending in JavaScript to guarantee order regardless of data type
+        logsArray.sort((a, b) => {
+          const timeA = new Date(a.timestamp || 0).getTime();
+          const timeB = new Date(b.timestamp || 0).getTime();
+          return timeB - timeA;
+        });
+        return logsArray.slice(0, limit);
       } else {
         return [];
       }
@@ -242,7 +257,7 @@ class DatabaseHandler {
    */
   async getUserAccessLogs(userId, limit = 50) {
     try {
-      const snapshot = await db.ref('access_logs')
+      const snapshot = await db.ref('logs')
         .orderByChild('userId')
         .equalTo(userId)
         .limitToLast(limit)
@@ -267,7 +282,7 @@ class DatabaseHandler {
    */
   listenToAccessLogs(callback) {
     try {
-      db.ref('access_logs').on('child_added', (snapshot) => {
+      db.ref('logs').on('child_added', (snapshot) => {
         callback(snapshot.val());
       });
       console.log('Real-time listener set up for access logs');
@@ -308,6 +323,21 @@ class DatabaseHandler {
       console.error('Error removing listener:', error);
       throw error;
     }
+  }
+
+  // ===== SYSTEM STATUS =====
+
+  /**
+   * Listen to Firebase Realtime Database connection status
+   */
+  checkConnection() {
+    db.ref('.info/connected').on('value', (snap) => {
+      if (snap.val() === true) {
+        console.log('✅ Successfully linked to Firebase Realtime Database!');
+      } else {
+        console.log('⏳ Connecting to Firebase...');
+      }
+    });
   }
 }
 
