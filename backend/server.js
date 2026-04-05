@@ -2,12 +2,25 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const http = require('http');
+const { Server } = require('socket.io');
 const databaseHandler = require('./databaseHandler');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Create HTTP server and initialize Socket.io
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: "*" }
+});
+
+// Listen to Firebase and emit to connected dashboards
+databaseHandler.listenToAccessLogs((newLog) => {
+    io.emit('new_access_log', newLog);
+});
 
 // Middleware
 app.use(express.json());
@@ -48,7 +61,7 @@ app.get('/api/users/:userId', async (req, res) => {
  */
 app.post('/api/users', async (req, res) => {
   try {
-    const { userId, email, name, role, uid } = req.body;
+    const { userId, email, name, role, department, uid } = req.body;
     
     if (!userId || !name) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -59,6 +72,7 @@ app.post('/api/users', async (req, res) => {
       name,
       uid: uid || '',
       role: role || 'user',
+      department: department || '',
       active: true
     });
     
@@ -209,8 +223,8 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 NFC Access Control Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚀 NFC Access Control Server running on port ${PORT} with WebSockets enabled!`);
   console.log(`📊 Access logs: http://localhost:${PORT}/api/access-logs`);
   console.log(`👥 Users: http://localhost:${PORT}/api/users`);
 

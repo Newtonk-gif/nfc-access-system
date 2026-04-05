@@ -6,7 +6,15 @@ dotenv.config();
 
 // Initialize Firebase Admin SDK
 // Make sure you have a service account JSON file
-const serviceAccount = require('./serviceAccountKey.json');
+let serviceAccount;
+try {
+  serviceAccount = require('./serviceAccountKey.json');
+} catch (error) {
+  console.error("\n❌ CRITICAL ERROR: Could not find 'serviceAccountKey.json' in the backend folder!");
+  console.error("Please go to Firebase Console -> Project Settings -> Service Accounts.");
+  console.error("Click 'Generate new private key', rename the file to 'serviceAccountKey.json', and place it in your 'backend' folder.\n");
+  process.exit(1);
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),

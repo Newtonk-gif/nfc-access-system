@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NFC Access Control</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="auth.js"></script>
     <script src="dashboard.js"></script>
 </head>
@@ -38,6 +40,7 @@
             <nav>
                 <a href="#" class="nav-item active">Live Monitor</a>
                 <a href="#" class="nav-item">User Management</a>
+                <a href="#" class="nav-item">Enrollment Console</a>
                 <button onclick="handleLogout()" class="logout-btn">Logout</button>
             </nav>
         </aside>
@@ -51,26 +54,37 @@
             </header>
 
             <div id="live-monitor-section">
-                <div class="action-header">
-                    <button id="enroll-btn" class="secondary-btn">Enroll New User</button>
+                <!-- Summary Counter Cards -->
+                <div class="summary-container" style="padding: 0 40px; margin-top: 20px;">
+                    <div class="summary-card">
+                        <h3>Total Scans</h3>
+                        <div id="total-scans-count" class="stat-value">0</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Access Granted</h3>
+                        <div id="granted-scans-count" class="stat-value success">0</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Access Denied</h3>
+                        <div id="denied-scans-count" class="stat-value danger">0</div>
+                    </div>
                 </div>
 
-                <div id="enroll-modal" class="modal-overlay hidden">
-                    <div class="modal-content">
-                        <h3>User Enrollment</h3>
-                        <p>Enter details and tap the new tag on the reader.</p>
-                        <form id="enroll-form">
-                            <input type="text" id="new-user-name" placeholder="Full Name" required>
-                            <input type="text" id="new-user-id" placeholder="Student/Staff ID" required>
-                            <div class="uid-waiting-box">
-                                <span id="uid-status">Waiting for NFC Scan...</span>
-                                <input type="text" id="captured-uid" readonly placeholder="UID will appear here">
-                            </div>
-                            <div class="modal-actions">
-                                <button type="button" onclick="closeEnrollModal()" class="cancel-btn">Cancel</button>
-                                <button type="submit" class="primary-btn">Save User</button>
-                            </div>
-                        </form>
+                <!-- Analytics Charts Wrapper -->
+                <div class="analytics-wrapper" style="padding: 0 40px;">
+                    <div class="chart-container"><canvas id="activityChart"></canvas></div>
+                    <div class="chart-container"><canvas id="statusPieChart"></canvas></div>
+                    <div class="chart-container"><canvas id="locationChart"></canvas></div>
+                </div>
+
+                <div class="search-container" style="padding: 0 40px; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <input type="text" id="log-search" class="search-input" placeholder="Search logs by name, UID, or location...">
+                    <div class="export-controls">
+                        <label for="export-start-date" style="font-size: 13px; font-weight: 600; color: #475569;">From:</label>
+                        <input type="date" id="export-start-date" class="date-input">
+                        <label for="export-end-date" style="font-size: 13px; font-weight: 600; color: #475569;">To:</label>
+                        <input type="date" id="export-end-date" class="date-input">
+                        <button id="export-csv-btn" class="secondary-btn" style="padding: 10px 15px; font-size: 14px;">Export CSV</button>
                     </div>
                 </div>
                 <section class="table-container">
@@ -96,24 +110,66 @@
 
             <div id="user-management-section" class="hidden">
                 <section class="table-container">
+                    <div class="search-container">
+                        <input type="text" id="user-search" class="search-input" placeholder="Search by name or UID...">
+                    </div>
                     <h2>User Management</h2>
                     <table id="user-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
                                 <th>Name</th>
+                                    <th>Role</th>
+                                    <th>Department</th>
                                 <th>UID</th>
                                 <th>Status</th>
                                 <th>Last Access</th>
+                                    <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="user-table-body">
                         </tbody>
                     </table>
                 </section>
+
+                <!-- Edit User Modal -->
+                <div id="edit-modal" class="modal-overlay hidden">
+                    <div class="modal-content">
+                        <h2 style="margin-bottom: 20px;">Edit User</h2>
+                        <form id="edit-form">
+                            <div class="input-group">
+                                <label for="edit-user-name">Full Name</label>
+                                <input type="text" id="edit-user-name" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="edit-user-role">Role</label>
+                                <select id="edit-user-role" style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; outline: none; margin-bottom: 5px;">
+                                    <option value="student">Student</option>
+                                    <option value="staff">Staff</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="edit-user-dept">Department</label>
+                                <input type="text" id="edit-user-dept" required>
+                            </div>
+                            <div class="input-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                                <input type="checkbox" id="edit-user-active" style="width: auto;">
+                                <label for="edit-user-active" style="margin: 0; font-size: 14px; cursor: pointer;">User is Active</label>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+                                <button type="submit" class="primary-btn">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
-        </main>
-            </section>
+            
+            <!-- Enrollment Iframe Section -->
+            <div id="enrollment-section" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
+                <iframe src="enrollment_test.html" style="width: 100%; height: 100%; border: none; flex: 1;"></iframe>
+            </div>
         </main>
     </div>
 

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enrollment Reader Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f3f4f6; color: #1f2937; padding: 24px; }
+    h1 { font-size: 20px; margin-bottom: 4px; color: #1A73E8; }
+    .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+    .card { background: white; border-radius: 10px; border: 1px solid #e5e7eb; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: #1f2937; }
+    .status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: #d1d5db; transition: background 0.4s; }
+    .dot.idle      { background: #9ca3af; }
+    .dot.waiting   { background: #f59e0b; animation: pulse 0.8s infinite; }
+    .dot.scanned   { background: #16a34a; }
+    .dot.duplicate { background: #dc2626; }
+    .dot.timeout   { background: #dc2626; }
+    .dot.error     { background: #dc2626; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    #status-text { font-size: 14px; font-weight: 600; }
+    .btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-blue { background: #1A73E8; color: white; }
+    .btn-gray { background: #e5e7eb; color: #374151; }
+    .btn-red  { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+    .btn-row  { display: flex; gap: 10px; flex-wrap: wrap; }
+    .uid-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; font-family: monospace; font-size: 20px; letter-spacing: 3px; color: #1A73E8; min-height: 48px; display: flex; align-items: center; }
+    .uid-box.empty { color: #9ca3af; font-size: 13px; letter-spacing: 0; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; color: #1f2937; background: white; }
+    input:focus, select:focus { outline: 2px solid #1A73E8; border-color: transparent; }
+    input[readonly] { background: #f3f4f6; color: #6b7280; }
+    .full-width { grid-column: 1 / -1; }
+    #log { background: #1e1e2e; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 12px; color: #a8d8a8; height: 180px; overflow-y: auto; }
+    #log .ts   { color: #6b7280; }
+    #log .ok   { color: #16a34a; }
+    #log .err  { color: #dc2626; }
+    #log .inf  { color: #60a5fa; }
+    #log .warn { color: #f59e0b; }
+    .pending-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+    .pending-item:last-child { border-bottom: none; }
+    .tag { font-family: monospace; font-weight: 700; color: #1A73E8; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+    .badge-pending  { background: #fef3c7; color: #92400e; }
+    .badge-enrolled { background: #d1fae5; color: #065f46; }
+    #pending-list { max-height: 200px; overflow-y: auto; }
+    .empty-msg { color: #9ca3af; font-size: 13px; padding: 12px; text-align: center; }
+    .success-banner { background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 8px; padding: 12px 16px; color: #065f46; font-size: 14px; font-weight: 600; display: none; margin-top: 12px; }
+    .duplicate-banner { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px; padding: 12px 16px; color: #991b1b; font-size: 13px; font-weight: 600; display: none; margin-top: 12px; }
+    .warn-box { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-bottom: 16px; }
+    
+    /* --- Custom Scrollbar --- */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Session Status</h2>
+  <div class="status-row">
+    <div class="dot idle" id="dot"></div>
+    <span id="status-text">Idle — ready to enroll</span>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-blue" id="btn-enroll" onclick="startEnrollment()">Start Enrollment</button>
+    <button class="btn btn-gray" id="btn-cancel" onclick="cancelEnrollment()" disabled>Cancel</button>
+    <button class="btn btn-red"  id="btn-reset"  onclick="resetSession()">Reset Session</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Captured UID</h2>
+  <div class="uid-box empty" id="uid-display">Waiting for card tap...</div>
+</div>
+
+<div class="card" id="form-card" style="display:none">
+  <h2>Complete User Details</h2>
+  <div class="duplicate-banner" id="duplicate-warn"></div>
+  <div class="form-grid" style="margin-top:12px">
+    <div class="full-width">
+      <label>RFID Tag UID (auto-filled)</label>
+      <input type="text" id="f-uid" readonly/>
+    </div>
+    <div>
+      <label>Full Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Alice Mwangi"/>
+    </div>
+    <div>
+      <label>Email</label>
+      <input type="email" id="f-email" placeholder="e.g. alice@example.com"/>
+    </div>
+    <div>
+      <label>Role</label>
+      <select id="f-role">
+        <option value="student">Student</option>
+        <option value="staff">Staff</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div>
+      <label>Department</label>
+      <input type="text" id="f-dept" placeholder="e.g. Computer Science"/>
+    </div>
+    <div class="full-width">
+      <label>Institution</label>
+      <input type="text" id="f-inst" placeholder="e.g. Main Campus" value="Main Campus"/>
+    </div>
+  </div>
+  <div style="margin-top:16px">
+    <button class="btn btn-blue" onclick="saveUser()" id="btn-save">Save User to Database</button>
+  </div>
+  <div class="success-banner" id="success-banner"></div>
+</div>
+
+<div class="card">
+  <h2>Pending Enrollments (/pending_enrollments)</h2>
+  <div id="pending-list"><p class="empty-msg">No pending enrollments</p></div>
+  <div style="margin-top:10px">
+    <button class="btn btn-gray" onclick="loadPending()" style="font-size:12px;padding:6px 14px">Refresh</button>
+    <button class="btn btn-red"  onclick="clearPending()" style="font-size:12px;padding:6px 14px;margin-left:8px">Clear all pending</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Activity Log</h2>
+  <div id="log"></div>
+</div>
+
+<script type="module">
+import { initializeApp }              from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyB-DK6trmKoPfbUvrCBTfzonLWh4dU_N28",
+  authDomain:        "attendance-logging-syste-5540c.firebaseapp.com",
+  databaseURL:       "https://attendance-logging-syste-5540c-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "attendance-logging-syste-5540c",
+  storageBucket:     "attendance-logging-syste-5540c.firebasestorage.app",
+  messagingSenderId: "685548152341",
+  appId:             "1:685548152341:web:e5eb89e21018f3e316901c"
+};
+
+const app  = initializeApp(firebaseConfig);
+const rtdb = getDatabase(app);
+const auth = getAuth(app);
+
+let enrollmentListener = null;
+let capturedUID        = null;
+
+function log(msg, type="") {
+  const el = document.getElementById("log");
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML += `<div><span class="ts">[${ts}]</span> <span class="${type}">${msg}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(state, text) {
+  document.getElementById("dot").className = "dot " + state;
+  document.getElementById("status-text").textContent = text;
+}
+
+function setUID(uid) {
+  const el = document.getElementById("uid-display");
+  if (uid) {
+    el.textContent = uid;
+    el.classList.remove("empty");
+    document.getElementById("f-uid").value = uid;
+  } else {
+    el.textContent = "Waiting for card tap...";
+    el.classList.add("empty");
+    document.getElementById("f-uid").value = "";
+  }
+}
+
+function hideDuplicateWarn() {
+  const el = document.getElementById("duplicate-warn");
+  el.style.display = "none";
+  el.textContent = "";
+}
+
+function showDuplicateWarn(uid) {
+  const el = document.getElementById("duplicate-warn");
+  el.textContent = "This card (" + uid + ") is already registered to an existing user. Please tap a different card.";
+  el.style.display = "block";
+}
+
+signInAnonymously(auth)
+  .then(() => log("Signed in anonymously to Firebase", "ok"))
+  .catch(e  => log("Auth failed: " + e.message, "err"));
+
+window.startEnrollment = async function() {
+  capturedUID = null;
+  setUID(null);
+  hideDuplicateWarn();
+  document.getElementById("form-card").style.display = "none";
+  document.getElementById("success-banner").style.display = "none";
+  document.getElementById("btn-enroll").disabled = true;
+  document.getElementById("btn-cancel").disabled = false;
+
+  try {
+    await set(ref(rtdb, "enrollment_session"), { status: "awaiting_scan", timestamp: Date.now() });
+    setStatus("waiting", "Waiting for card tap on Pico WH... (60s timeout)");
+    log("Enrollment session started — Pico WH is now listening", "inf");
+
+    enrollmentListener = onValue(ref(rtdb, "enrollment_session"), (snap) => {
+      const session = snap.val();
+      if (!session) return;
+
+      if (session.status === "scanned") {
+        capturedUID = session.uid;
+        stopListening();
+        setUID(capturedUID);
+        setStatus("scanned", "Card scanned — fill in user details below.");
+        log("UID captured: " + capturedUID, "ok");
+        document.getElementById("form-card").style.display = "block";
+        document.getElementById("btn-enroll").disabled = false;
+        document.getElementById("btn-cancel").disabled = true;
+        loadPending();
+
+      } else if (session.status === "duplicate") {
+        stopListening();
+        setStatus("duplicate", "Duplicate tag — this card is already in pending enrollments.");
+        log("Duplicate tag detected by Pico WH", "warn");
+        document.getElementById("btn-enroll").disabled = false;
+        document.getElementById("btn-cancel").disabled = true;
+
+      } else if (session.status === "timeout") {
+        stopListening();
+        setStatus("idle", "Timed out — no card tapped within 60 seconds.");
+        log("Enrollment timed out", "warn");
+        document.getElementById("btn-enroll").disabled = false;
+        document.getElementById("btn-cancel").disabled = true;
+
+      } else if (session.status === "error") {
+        stopListening();
+        setStatus("error", "Pico WH reported a write error. Check Serial Monitor.");
+        log("Pico WH reported an error", "err");
+        document.getElementById("btn-enroll").disabled = false;
+        document.getElementById("btn-cancel").disabled = true;
+      }
+    });
+
+  } catch(e) {
+    log("Failed to start enrollment: " + e.message, "err");
+    document.getElementById("btn-enroll").disabled = false;
+  }
+}
+
+window.cancelEnrollment = async function() {
+  stopListening();
+  await set(ref(rtdb, "enrollment_session"), { status: "idle" });
+  setStatus("idle", "Cancelled — ready to enroll");
+  log("Enrollment cancelled", "warn");
+  document.getElementById("btn-enroll").disabled = false;
+  document.getElementById("btn-cancel").disabled = true;
+}
+
+window.resetSession = async function() {
+  stopListening();
+  await set(ref(rtdb, "enrollment_session"), { status: "idle" });
+  setUID(null);
+  hideDuplicateWarn();
+  setStatus("idle", "Session reset — ready to enroll");
+  document.getElementById("form-card").style.display = "none";
+  document.getElementById("success-banner").style.display = "none";
+  document.getElementById("btn-enroll").disabled = false;
+  document.getElementById("btn-cancel").disabled = true;
+  log("Session manually reset to idle", "warn");
+}
+
+function stopListening() {
+  if (enrollmentListener) { enrollmentListener(); enrollmentListener = null; }
+}
+
+window.saveUser = async function() {
+  const name  = document.getElementById("f-name").value.trim();
+  const email = document.getElementById("f-email").value.trim();
+  const role  = document.getElementById("f-role").value;
+  const dept  = document.getElementById("f-dept").value.trim();
+  const inst  = document.getElementById("f-inst").value.trim();
+
+  if (!capturedUID) { log("No UID captured yet", "err"); return; }
+  if (!name)        { log("Name is required", "err"); return; }
+  if (!dept)        { log("Department is required", "err"); return; }
+
+  document.getElementById("btn-save").disabled = true;
+  hideDuplicateWarn();
+
+  // Create a unique ID for the user
+  const userId = "USR_" + Date.now();
+
+  try {
+    // Call the centralized Node.js backend to save the user and tag
+    const response = await fetch("http://localhost:3000/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+            userId: userId, 
+            name: name, 
+            email: email, 
+            role: role, 
+            department: dept,
+            uid: capturedUID 
+        })
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+        log("Backend Save Failed: " + result.error, "err");
+        throw new Error(result.error);
+    }
+
+    log("User saved via API: " + name + " | Tag: " + capturedUID, "ok");
+
+    // Clean up pending entry for this UID in RTDB
+    const pendingSnap = await get(ref(rtdb, "pending_enrollments"));
+    if (pendingSnap.exists()) {
+      pendingSnap.forEach(child => {
+        if (child.val().uid === capturedUID) {
+          remove(ref(rtdb, "pending_enrollments/" + child.key));
+        }
+      });
+    }
+
+    await set(ref(rtdb, "enrollment_session"), { status: "idle" });
+
+    const banner = document.getElementById("success-banner");
+    banner.textContent = name + " enrolled successfully! Tag: " + capturedUID;
+    banner.style.display = "block";
+
+    setStatus("idle", "Enrollment complete — ready for next user");
+    setUID(null);
+    capturedUID = null;
+    loadPending();
+
+  } catch(e) {
+    log("Save failed: " + e.message, "err");
+  } finally {
+    document.getElementById("btn-save").disabled = false;
+  }
+}
+
+window.loadPending = async function() {
+  const listEl = document.getElementById("pending-list");
+  try {
+    const snap = await get(ref(rtdb, "pending_enrollments"));
+    if (!snap.exists()) {
+      listEl.innerHTML = '<p class="empty-msg">No pending enrollments</p>';
+      return;
+    }
+    let html = "";
+    snap.forEach(child => {
+      const d = child.val();
+      if (d === "empty" || !d.uid) return;
+      const ts = d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : "—";
+      html += '<div class="pending-item"><span class="tag">' + d.uid + '</span><span style="color:#6b7280;font-size:12px">' + ts + '</span><span class="badge badge-' + d.status + '">' + d.status + '</span></div>';
+    });
+    listEl.innerHTML = html || '<p class="empty-msg">No pending enrollments</p>';
+  } catch(e) {
+    log("Failed to load pending: " + e.message, "err");
+  }
+}
+
+window.clearPending = async function() {
+  await remove(ref(rtdb, "pending_enrollments"));
+  await set(ref(rtdb, "pending_enrollments/placeholder"), "empty");
+  log("Cleared all pending enrollments", "warn");
+  loadPending();
+}
+
+loadPending();
+log("Test console ready", "inf");
+</script>
+</body>
+</html>
