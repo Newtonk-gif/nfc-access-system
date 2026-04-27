@@ -19,8 +19,8 @@ let activityChart = null;
 let statusPieChart = null;
 let locationChart = null;
 
-// Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
-const API_BASE_URL = 'YOUR_ACTUAL_RENDER_URL_HERE';
+// Backend API URL (Update the port if your Node server runs on a different one)
+const API_BASE_URL = 'http://localhost:3000';
 
 function initDashboard() {
     console.log("Dashboard has been initialized.");
