@@ -8,7 +8,11 @@ dotenv.config();
 // Make sure you have a service account JSON file
 let serviceAccount;
 try {
-  serviceAccount = require('./serviceAccountKey.json');
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    serviceAccount = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  } else {
+    serviceAccount = require('./serviceAccountKey.json');
+  }
 } catch (error) {
   console.error("\n❌ CRITICAL ERROR: Could not find 'serviceAccountKey.json' in the backend folder!");
   console.error("Please go to Firebase Console -> Project Settings -> Service Accounts.");
