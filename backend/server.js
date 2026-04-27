@@ -227,6 +227,17 @@ app.get('/api/users/:userId/access-logs', async (req, res) => {
   }
 });
 
+// Root endpoint for testing the URL directly
+app.get('/', (req, res) => {
+  res.send(`
+    <div style="font-family: sans-serif; padding: 2rem; text-align: center; margin-top: 50px;">
+      <h1 style="color: #16a34a;">✅ NFC Backend is Live!</h1>
+      <p>The Node.js server is successfully running and connected to Firebase.</p>
+      <p>Health Check: <a href="/health">/health</a></p>
+    </div>
+  `);
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
