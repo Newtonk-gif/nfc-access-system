@@ -19,8 +19,8 @@ let activityChart = null;
 let statusPieChart = null;
 let locationChart = null;
 
-// Backend API URL (Update the port if your Node server runs on a different one)
-const API_BASE_URL = 'http://localhost:3000';
+// Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
+const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
 
 function initDashboard() {
     console.log("Dashboard has been initialized.");
@@ -152,6 +152,9 @@ function checkServerStatus() {
 
 // Fetch users from API and render table
 function fetchAndRenderUsers() {
+    if (userTableBody) {
+        userTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #6b7280; font-weight: bold;">⏳ Waking up backend and loading users... (May take up to 50 seconds)</td></tr>';
+    }
     fetch(`${API_BASE_URL}/api/users`) // point at backend API
         .then(res => res.json())
         .then(response => {
@@ -183,6 +186,8 @@ function renderUserTable() {
             (u.uid && u.uid.toLowerCase().includes(term))
         );
     }
+    
+    logTable.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280; font-weight: bold;">⏳ Waking up backend and loading activity... (May take up to 50 seconds)</td></tr>';
 
     if (filteredUsers.length === 0) {
         userTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No users found</td></tr>';
