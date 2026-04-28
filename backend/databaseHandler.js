@@ -215,12 +215,12 @@ class DatabaseHandler {
         logEntry.userId = tag.userId;
       }
 
-      // Create log entry with auto-generated Document ID
-      const newLogRef = firestore.collection('logs').doc();
+      // Create log entry with auto-generated ID in Realtime Database
+      const newLogRef = db.ref('logs').push();
       await newLogRef.set(logEntry);
 
-      console.log(`Access event logged in Firestore - Tag: ${tagUID}, Location: ${location}, Granted: ${granted}`);
-      return { success: true, logId: newLogRef.id };
+      console.log(`Access event logged in RTDB - Tag: ${tagUID}, Location: ${location}, Granted: ${granted}`);
+      return { success: true, logId: newLogRef.key };
     } catch (error) {
       console.error('Error logging access event:', error);
       throw error;
@@ -233,13 +233,17 @@ class DatabaseHandler {
    */
   async getAccessLogs(limit = 50) {
     try {
-      const snapshot = await firestore.collection('logs')
-        .orderBy('timestamp', 'desc')
-        .limit(limit)
-        .get();
+      const snapshot = await db.ref('logs').get();
 
-      if (!snapshot.empty) {
-        return snapshot.docs.map(doc => doc.data());
+      if (snapshot.exists()) {
+        let logsArray = Object.values(snapshot.val());
+        // Sort descending to show newest logs first
+        logsArray.sort((a, b) => {
+          const timeA = new Date(a.timestamp || 0).getTime();
+          const timeB = new Date(b.timestamp || 0).getTime();
+          return timeB - timeA;
+        });
+        return logsArray.slice(0, limit);
       } else {
         return [];
       }
@@ -256,15 +260,14 @@ class DatabaseHandler {
    */
   async getUserAccessLogs(userId, limit = 50) {
     try {
-      // Query by userId and sort in memory (avoids requiring a complex composite index setup in Firestore)
-      const snapshot = await firestore.collection('logs')
-        .where('userId', '==', userId)
+      const snapshot = await db.ref('logs')
+        .orderByChild('userId')
+        .equalTo(userId)
+        .limitToLast(limit)
         .get();
 
-      if (!snapshot.empty) {
-        let logsArray = snapshot.docs.map(doc => doc.data());
-        logsArray.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        return logsArray.slice(0, limit);
+      if (snapshot.exists()) {
+        return Object.values(snapshot.val()).reverse();
       } else {
         return [];
       }
@@ -282,15 +285,10 @@ class DatabaseHandler {
    */
   listenToAccessLogs(callback) {
     try {
-      const now = new Date().toISOString();
-      firestore.collection('logs')
-        .where('timestamp', '>=', now)
-        .onSnapshot(snapshot => {
-          snapshot.docChanges().forEach(change => {
-            if (change.type === 'added') callback(change.doc.data());
-          });
-        });
-      console.log('Real-time listener set up for access logs (Firestore)');
+      db.ref('logs').on('child_added', (snapshot) => {
+        callback(snapshot.val());
+      });
+      console.log('Real-time listener set up for access logs (RTDB)');
     } catch (error) {
       console.error('Error setting up listener:', error);
       throw error;
@@ -322,7 +320,8 @@ class DatabaseHandler {
    */
   removeListener(path) {
     try {
-      console.log(`Listener removal invoked. (Note: Firestore uses unsub function references instead of path strings)`);
+      db.ref(path).off();
+      console.log(`Listener removed for path: ${path}`);
     } catch (error) {
       console.error('Error removing listener:', error);
       throw error;
