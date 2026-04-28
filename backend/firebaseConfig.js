@@ -14,7 +14,8 @@ try {
     serviceAccount = require('./serviceAccountKey.json');
   }
 } catch (error) {
-  console.error("\n❌ CRITICAL ERROR: Could not find 'serviceAccountKey.json' in the backend folder!");
+  console.error("\n❌ CRITICAL ERROR: Failed to load Firebase credentials!");
+  console.error("👉 Actual Node.js Error:", error.message);
   console.error("Please go to Firebase Console -> Project Settings -> Service Accounts.");
   console.error("Click 'Generate new private key', rename the file to 'serviceAccountKey.json', and place it in your 'backend' folder.\n");
   process.exit(1);
