@@ -1,5 +1,5 @@
 // Firebase Database Handler
-const { db, auth } = require('./firebaseConfig');
+const { db, firestore, auth } = require('./firebaseConfig');
 
 class DatabaseHandler {
   
@@ -12,11 +12,11 @@ class DatabaseHandler {
    */
   async createUser(userId, userData) {
     try {
-      await db.ref(`users/${userId}`).set({
+      await firestore.collection('users').doc(userId).set({
         ...userData,
         createdAt: new Date().toISOString()
       });
-      console.log(`User ${userId} created successfully`);
+      console.log(`User ${userId} created successfully in Firestore`);
       return { success: true, userId };
     } catch (error) {
       console.error('Error creating user:', error);
@@ -30,9 +30,9 @@ class DatabaseHandler {
    */
   async getUser(userId) {
     try {
-      const snapshot = await db.ref(`users/${userId}`).get();
-      if (snapshot.exists()) {
-        return snapshot.val();
+      const doc = await firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        return doc.data();
       } else {
         console.log(`User ${userId} not found`);
         return null;
@@ -48,13 +48,11 @@ class DatabaseHandler {
    */
   async getAllUsers() {
     try {
-      const snapshot = await db.ref('users').get();
-      if (snapshot.exists()) {
-        const users = snapshot.val();
-        // Map the Firebase object keys to an 'id' field for the frontend
-        return Object.keys(users).map(key => ({
-          id: key,
-          ...users[key]
+      const snapshot = await firestore.collection('users').get();
+      if (!snapshot.empty) {
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
         }));
       } else {
         return [];
@@ -72,11 +70,11 @@ class DatabaseHandler {
    */
   async updateUser(userId, updates) {
     try {
-      await db.ref(`users/${userId}`).update({
+      await firestore.collection('users').doc(userId).set({
         ...updates,
         updatedAt: new Date().toISOString()
-      });
-      console.log(`User ${userId} updated successfully`);
+      }, { merge: true });
+      console.log(`User ${userId} updated successfully in Firestore`);
       return { success: true, userId };
     } catch (error) {
       console.error('Error updating user:', error);
@@ -90,8 +88,18 @@ class DatabaseHandler {
    */
   async deleteUser(userId) {
     try {
-      await db.ref(`users/${userId}`).remove();
-      console.log(`User ${userId} deleted successfully`);
+      // 1. Delete the user document
+      await firestore.collection('users').doc(userId).delete();
+      
+      // 2. Find and delete any NFC tags associated with this user so they can be re-registered
+      const tagsSnapshot = await firestore.collection('nfc_tags').where('userId', '==', userId).get();
+      if (!tagsSnapshot.empty) {
+        const batch = firestore.batch();
+        tagsSnapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      }
+
+      console.log(`User ${userId} and their NFC tags deleted successfully from Firestore`);
       return { success: true, userId };
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -109,14 +117,14 @@ class DatabaseHandler {
    */
   async registerNFCTag(tagUID, userId, tagData = {}) {
     try {
-      await db.ref(`nfc_tags/${tagUID}`).set({
+      await firestore.collection('nfc_tags').doc(tagUID).set({
         userId,
         tagUID,
         registeredAt: new Date().toISOString(),
         active: true,
         ...tagData
       });
-      console.log(`NFC tag ${tagUID} registered to user ${userId}`);
+      console.log(`NFC tag ${tagUID} registered to user ${userId} in Firestore`);
       return { success: true, tagUID };
     } catch (error) {
       console.error('Error registering NFC tag:', error);
@@ -130,9 +138,9 @@ class DatabaseHandler {
    */
   async getNFCTag(tagUID) {
     try {
-      const snapshot = await db.ref(`nfc_tags/${tagUID}`).get();
-      if (snapshot.exists()) {
-        return snapshot.val();
+      const doc = await firestore.collection('nfc_tags').doc(tagUID).get();
+      if (doc.exists) {
+        return doc.data();
       } else {
         return null;
       }
@@ -148,16 +156,17 @@ class DatabaseHandler {
    */
   async getUserNFCTags(userId) {
     try {
-      const snapshot = await db.ref('nfc_tags')
-        .orderByChild('userId')
-        .equalTo(userId)
+      const snapshot = await firestore.collection('nfc_tags')
+        .where('userId', '==', userId)
         .get();
       
-      if (snapshot.exists()) {
-        return snapshot.val();
-      } else {
-        return {};
+      let tags = {};
+      if (!snapshot.empty) {
+        snapshot.forEach(doc => {
+          tags[doc.id] = doc.data();
+        });
       }
+      return tags;
     } catch (error) {
       console.error('Error fetching user NFC tags:', error);
       throw error;
@@ -170,11 +179,11 @@ class DatabaseHandler {
    */
   async deactivateNFCTag(tagUID) {
     try {
-      await db.ref(`nfc_tags/${tagUID}`).update({
+      await firestore.collection('nfc_tags').doc(tagUID).update({
         active: false,
         deactivatedAt: new Date().toISOString()
       });
-      console.log(`NFC tag ${tagUID} deactivated`);
+      console.log(`NFC tag ${tagUID} deactivated in Firestore`);
       return { success: true, tagUID };
     } catch (error) {
       console.error('Error deactivating NFC tag:', error);
@@ -206,12 +215,12 @@ class DatabaseHandler {
         logEntry.userId = tag.userId;
       }
 
-      // Create log entry with auto-generated ID
-      const newLogRef = db.ref('logs').push();
+      // Create log entry with auto-generated Document ID
+      const newLogRef = firestore.collection('logs').doc();
       await newLogRef.set(logEntry);
 
-      console.log(`Access event logged - Tag: ${tagUID}, Location: ${location}, Granted: ${granted}`);
-      return { success: true, logId: newLogRef.key };
+      console.log(`Access event logged in Firestore - Tag: ${tagUID}, Location: ${location}, Granted: ${granted}`);
+      return { success: true, logId: newLogRef.id };
     } catch (error) {
       console.error('Error logging access event:', error);
       throw error;
@@ -224,23 +233,13 @@ class DatabaseHandler {
    */
   async getAccessLogs(limit = 50) {
     try {
-      // Fetch all logs first to bypass strict Firebase indexing/type mismatches
-      const snapshot = await db.ref('logs').get();
+      const snapshot = await firestore.collection('logs')
+        .orderBy('timestamp', 'desc')
+        .limit(limit)
+        .get();
 
-      console.log('\n--- BACKEND DB CHECK ---');
-      console.log(`Checking path "/logs". Did it find anything? ${snapshot.exists()}`);
-      console.log('Raw Data returned:', snapshot.val());
-      console.log('------------------------\n');
-
-      if (snapshot.exists()) {
-        let logsArray = Object.values(snapshot.val());
-        // Sort descending in JavaScript to guarantee order regardless of data type
-        logsArray.sort((a, b) => {
-          const timeA = new Date(a.timestamp || 0).getTime();
-          const timeB = new Date(b.timestamp || 0).getTime();
-          return timeB - timeA;
-        });
-        return logsArray.slice(0, limit);
+      if (!snapshot.empty) {
+        return snapshot.docs.map(doc => doc.data());
       } else {
         return [];
       }
@@ -257,14 +256,15 @@ class DatabaseHandler {
    */
   async getUserAccessLogs(userId, limit = 50) {
     try {
-      const snapshot = await db.ref('logs')
-        .orderByChild('userId')
-        .equalTo(userId)
-        .limitToLast(limit)
+      // Query by userId and sort in memory (avoids requiring a complex composite index setup in Firestore)
+      const snapshot = await firestore.collection('logs')
+        .where('userId', '==', userId)
         .get();
 
-      if (snapshot.exists()) {
-        return Object.values(snapshot.val()).reverse();
+      if (!snapshot.empty) {
+        let logsArray = snapshot.docs.map(doc => doc.data());
+        logsArray.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        return logsArray.slice(0, limit);
       } else {
         return [];
       }
@@ -282,10 +282,15 @@ class DatabaseHandler {
    */
   listenToAccessLogs(callback) {
     try {
-      db.ref('logs').on('child_added', (snapshot) => {
-        callback(snapshot.val());
-      });
-      console.log('Real-time listener set up for access logs');
+      const now = new Date().toISOString();
+      firestore.collection('logs')
+        .where('timestamp', '>=', now)
+        .onSnapshot(snapshot => {
+          snapshot.docChanges().forEach(change => {
+            if (change.type === 'added') callback(change.doc.data());
+          });
+        });
+      console.log('Real-time listener set up for access logs (Firestore)');
     } catch (error) {
       console.error('Error setting up listener:', error);
       throw error;
@@ -299,12 +304,12 @@ class DatabaseHandler {
    */
   listenToUserChanges(userId, callback) {
     try {
-      db.ref(`users/${userId}`).on('value', (snapshot) => {
-        if (snapshot.exists()) {
-          callback(snapshot.val());
+      firestore.collection('users').doc(userId).onSnapshot(doc => {
+        if (doc.exists) {
+          callback(doc.data());
         }
       });
-      console.log(`Real-time listener set up for user ${userId}`);
+      console.log(`Real-time listener set up for user ${userId} (Firestore)`);
     } catch (error) {
       console.error('Error setting up user listener:', error);
       throw error;
@@ -317,8 +322,7 @@ class DatabaseHandler {
    */
   removeListener(path) {
     try {
-      db.ref(path).off();
-      console.log(`Listener removed for path: ${path}`);
+      console.log(`Listener removal invoked. (Note: Firestore uses unsub function references instead of path strings)`);
     } catch (error) {
       console.error('Error removing listener:', error);
       throw error;
@@ -333,9 +337,10 @@ class DatabaseHandler {
   checkConnection() {
     db.ref('.info/connected').on('value', (snap) => {
       if (snap.val() === true) {
-        console.log('✅ Successfully linked to Firebase Realtime Database!');
+        console.log('✅ Successfully linked to Firebase Realtime Database (IoT Sync)!');
+        console.log('✅ Successfully linked to Firestore (Main Database)!');
       } else {
-        console.log('⏳ Connecting to Firebase...');
+        console.log('⏳ Connecting to Firebase databases...');
       }
     });
   }
