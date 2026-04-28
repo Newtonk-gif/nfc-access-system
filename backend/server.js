@@ -15,7 +15,14 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 // Define the exact frontend URLs allowed to connect to this backend
-const allowedOrigins = ['https://attendance-logging-syste-5540c.web.app', 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://127.0.0.1:5500', 'http://localhost:5500'];
+const allowedOrigins = [
+    'https://attendance-logging-syste-5540c.web.app',
+    'https://attendance-logging-syste-5540c.firebaseapp.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5500',
+    'http://localhost:5500'
+];
 
 const io = new Server(server, {
     cors: { 
