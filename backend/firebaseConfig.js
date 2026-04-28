@@ -1,5 +1,6 @@
 // Firebase Admin SDK Configuration
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -27,10 +28,12 @@ admin.initializeApp({
 });
 
 const db = admin.database();
+const firestore = getFirestore();
 const auth = admin.auth();
 
 module.exports = {
   admin,
   db,
+  firestore,
   auth
 };
