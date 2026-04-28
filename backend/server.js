@@ -77,6 +77,14 @@ app.post('/api/users', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
+    // Check if the NFC tag is already registered
+    if (uid) {
+      const existingTag = await databaseHandler.getNFCTag(uid);
+      if (existingTag) {
+        return res.status(400).json({ success: false, error: 'This NFC card is already registered to another user.' });
+      }
+    }
+
     const result = await databaseHandler.createUser(userId, {
       email: email || '',
       name,
@@ -132,6 +140,12 @@ app.post('/api/nfc-tags/register', async (req, res) => {
     
     if (!tagUID || !userId) {
       return res.status(400).json({ success: false, error: 'Missing tagUID or userId' });
+    }
+
+    // Check if the NFC tag is already registered
+    const existingTag = await databaseHandler.getNFCTag(tagUID);
+    if (existingTag) {
+      return res.status(400).json({ success: false, error: 'This NFC card is already registered to another user.' });
     }
 
     const result = await databaseHandler.registerNFCTag(tagUID, userId);
