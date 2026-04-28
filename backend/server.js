@@ -244,7 +244,7 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 NFC Access Control Server running on port ${PORT} with WebSockets enabled!`);
   console.log(`📊 Access logs: http://localhost:${PORT}/api/access-logs`);
   console.log(`👥 Users: http://localhost:${PORT}/api/users`);
