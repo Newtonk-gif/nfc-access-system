@@ -186,8 +186,6 @@ function renderUserTable() {
             (u.uid && u.uid.toLowerCase().includes(term))
         );
     }
-    
-    logTable.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280; font-weight: bold;">⏳ Waking up backend and loading activity... (May take up to 50 seconds)</td></tr>';
 
     if (filteredUsers.length === 0) {
         userTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No users found</td></tr>';
