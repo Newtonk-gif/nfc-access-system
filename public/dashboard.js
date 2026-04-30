@@ -683,8 +683,12 @@ async function handlePaymentSubmit(e) {
 
         // Catch 404s, 500s, or CORS errors before attempting to parse JSON
         if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`HTTP Error ${response.status}: ${errText}`);
+            let errText = await response.text();
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson.error) errText = errJson.error;
+            } catch (e) { /* ignore parse error */ }
+            throw new Error(errText || `HTTP ${response.status} Error`);
         }
         const data = await response.json();
 
@@ -696,7 +700,7 @@ async function handlePaymentSubmit(e) {
         }
     } catch (err) {
         console.error('Payment initiation error:', err);
-        showPaymentStatus('Error connecting to the payment service.', 'error');
+        showPaymentStatus(`Error: ${err.message}`, 'error');
     }
 }
 
