@@ -189,11 +189,6 @@ input:focus {
     color: #94a3b8;
 }
 
-.nav-item.active {
-    background-color: inherit;
-    color: #94a3b8;
-}
-
 .logout-btn {
     margin-top: auto;
     background: none;

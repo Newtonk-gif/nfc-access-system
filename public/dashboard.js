@@ -20,8 +20,8 @@ let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
-// Firebase Functions URL for M-Pesa (Replace with your actual deployed URL)
-const MPESA_CLOUD_FUNCTION_URL = 'https://us-central1-attendance-logging-syste-5540c.cloudfunctions.net/initiateMpesaPayment';
+// Render API URL for M-Pesa
+const MPESA_API_URL = `${API_BASE_URL}/api/mpesa/pay`;
 
 function initDashboard() {
     console.log("Dashboard has been initialized.");
@@ -675,7 +675,7 @@ async function handlePaymentSubmit(e) {
     showPaymentStatus('Initiating M-Pesa prompt... please check your phone.', 'info');
 
     try {
-        const response = await fetch(MPESA_CLOUD_FUNCTION_URL, {
+        const response = await fetch(MPESA_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone, amount })

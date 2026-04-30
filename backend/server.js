@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
 const databaseHandler = require('./databaseHandler');
+const axios = require('axios');
 
 dotenv.config();
 
@@ -239,6 +240,101 @@ app.get('/api/users/:userId/access-logs', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// ===== M-PESA PAYMENT ENDPOINTS =====
+
+// --- M-Pesa Configuration ---
+const BUSINESS_SHORT_CODE = process.env.MPESA_SHORTCODE || "174379";
+const PASSKEY = process.env.MPESA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+const CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY || "bsAnhvj1VJDYoruubasQaBQdrhbmfFESeObTeGoFkexM34XY";
+const CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET || "ZBWeuZHq6R7GKgbiBnYpFQ9eGXK1k9jQusHmzD50zJ891r67O364KP9Nnn0QaUhY";
+
+const DARASA_AUTH_URL = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
+const DARASA_STK_PUSH_URL = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
+
+// --- M-Pesa Utility Functions ---
+const getTimestamp = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}${month}${day}${hours}${minutes}${seconds}`;
+};
+
+const generatePassword = (shortcode, passkey, timestamp) => {
+    return Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+};
+
+const getAuthToken = async () => {
+    const credentials = Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString("base64");
+    try {
+        const response = await axios.get(DARASA_AUTH_URL, {
+            headers: { "Authorization": `Basic ${credentials}` },
+        });
+        return response.data.access_token;
+    } catch (error) {
+        console.error("Failed to get M-Pesa auth token:", error.message);
+        throw new Error("Could not authenticate with M-Pesa.");
+    }
+};
+
+// Trigger Payment Route
+app.post('/api/mpesa/pay', async (req, res) => {
+    const { amount, phone } = req.body;
+
+    if (!amount || !phone) return res.status(400).json({ success: false, error: "Missing amount or phone" });
+
+    const parsedAmount = parseInt(amount, 10);
+    if (!/^254\d{9}$/.test(phone)) return res.status(400).json({ success: false, error: "Invalid phone format. Use 254XXXXXXXXX." });
+
+    try {
+        const token = await getAuthToken();
+        const timestamp = getTimestamp();
+        const password = generatePassword(BUSINESS_SHORT_CODE, PASSKEY, timestamp);
+
+        const payload = {
+            BusinessShortCode: BUSINESS_SHORT_CODE,
+            Password: password,
+            Timestamp: timestamp,
+            TransactionType: "CustomerPayBillOnline", 
+            Amount: parsedAmount,
+            PartyA: phone, 
+            PartyB: BUSINESS_SHORT_CODE, 
+            PhoneNumber: phone, 
+            CallBackURL: `https://nfc-access-system-1.onrender.com/api/mpesa/callback`, // Safaricom will call this Render URL
+            AccountReference: "NFC-Payment", 
+            TransactionDesc: "Payment for NFC service",
+        };
+
+        const response = await axios.post(DARASA_STK_PUSH_URL, payload, {
+            headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        console.log("M-Pesa STK Push initiated successfully:", response.data);
+        res.status(200).json({ success: true, data: response.data });
+    } catch (error) {
+        console.error("Error initiating M-Pesa payment:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Safaricom Callback Route
+app.post('/api/mpesa/callback', (req, res) => {
+    console.log("Received M-Pesa callback:", JSON.stringify(req.body, null, 2));
+    
+    if (req.body?.Body?.stkCallback?.ResultCode === 0) {
+        console.log("Payment successful!");
+        // TODO: Later, we can add logic here to update Firestore using your databaseHandler
+    } else {
+        console.log("Payment failed or cancelled by user.");
+    }
+
+    // Always acknowledge receipt to Safaricom
+    res.status(200).json({ "ResultCode": 0, "ResultDesc": "Accepted" });
 });
 
 // Root endpoint for testing the URL directly
