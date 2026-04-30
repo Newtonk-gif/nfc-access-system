@@ -2,7 +2,7 @@
 let logTable;
 let userTableBody;
 let userManagementSection, liveMonitorSection;
-let enrollmentSection;
+let enrollmentSection, paymentSection;
 let editModal, editForm, editUserNameInput, editUserRoleInput, editUserDeptInput, editUserActiveInput, currentEditUserId;
 let userSearchInput;
 let logSearchInput;
@@ -21,7 +21,7 @@ let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
 // Firebase Functions URL for M-Pesa (Replace with your actual deployed URL)
-const MPESA_CLOUD_FUNCTION_URL = 'https://us-central1-<YOUR-PROJECT-ID>.cloudfunctions.net/initiateMpesaPayment';
+const MPESA_CLOUD_FUNCTION_URL = 'https://us-central1-attendance-logging-syste-5540c.cloudfunctions.net/initiateMpesaPayment';
 
 function initDashboard() {
     console.log("Dashboard has been initialized.");
@@ -32,6 +32,7 @@ function initDashboard() {
     userManagementSection = document.getElementById('user-management-section');
     liveMonitorSection = document.getElementById('live-monitor-section');
     enrollmentSection = document.getElementById('enrollment-section');
+    paymentSection = document.getElementById('payment-section');
     editModal = document.getElementById('edit-modal');
     editForm = document.getElementById('edit-form');
     editUserNameInput = document.getElementById('edit-user-name');
@@ -57,21 +58,25 @@ function initDashboard() {
             navItems.forEach(i => i.classList.remove('active'));
             item.classList.add('active');
             
-            const target = item.textContent.trim();
-            if (target === 'User Management') {
-                liveMonitorSection.classList.add('hidden');
-                if (enrollmentSection) enrollmentSection.classList.add('hidden');
+            const target = item.textContent.trim().toLowerCase();
+            
+            // Hide all sections first for a clean slate
+            liveMonitorSection.classList.add('hidden');
+            userManagementSection.classList.add('hidden');
+            if (enrollmentSection) enrollmentSection.classList.add('hidden');
+            if (paymentSection) paymentSection.classList.add('hidden');
+
+            if (target.includes('user')) {
                 userManagementSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'User Management';
                 fetchAndRenderUsers();
-            } else if (target === 'Enrollment Console') {
-                liveMonitorSection.classList.add('hidden');
-                userManagementSection.classList.add('hidden');
+            } else if (target.includes('enrollment')) {
                 if (enrollmentSection) enrollmentSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'Enrollment Console';
+            } else if (target.includes('payment')) {
+                if (paymentSection) paymentSection.classList.remove('hidden');
+                document.getElementById('dashboard-title').textContent = 'M-Pesa Payments';
             } else {
-                userManagementSection.classList.add('hidden');
-                if (enrollmentSection) enrollmentSection.classList.add('hidden');
                 liveMonitorSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'Live Activity Feed';
                 fetchAndRenderLogs();

@@ -41,6 +41,7 @@
                 <a href="#" class="nav-item active">Live Monitor</a>
                 <a href="#" class="nav-item">User Management</a>
                 <a href="#" class="nav-item">Enrollment Console</a>
+                <a href="#" class="nav-item">Payment Portal</a>
                 <button onclick="handleLogout()" class="logout-btn">Logout</button>
             </nav>
         </aside>
@@ -166,16 +167,15 @@
                 </div>
             </div>
             
-            <!-- Enrollment & Payment Section -->
-            <div id="enrollment-section" class="hidden" style="height: 100%; display: flex; flex-direction: row; gap: 20px; padding: 20px;">
-                <!-- Left side: Enrollment Iframe -->
-                <div style="flex: 2; display: flex; flex-direction: column; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #fff;">
-                     <iframe src="enrollment_test.html" style="width: 100%; height: 100%; border: none; flex: 1;"></iframe>
-                </div>
-    
-                <!-- Right side: Payment Panel -->
-                <div style="flex: 1; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; height: fit-content;">
-                    <h2 style="margin-bottom: 20px;">Make a Payment (M-Pesa)</h2>
+            <!-- Enrollment Iframe Section -->
+            <div id="enrollment-section" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
+                <iframe src="enrollment_test.html" style="width: 100%; height: 100%; border: none; flex: 1;"></iframe>
+            </div>
+
+            <!-- Payment Section -->
+            <div id="payment-section" class="hidden" style="padding: 40px; display: flex; justify-content: center; align-items: flex-start; height: 100%;">
+                <div style="width: 100%; max-width: 500px; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <h2 style="margin-bottom: 20px; text-align: center; color: #1e293b;">Make a Payment (M-Pesa)</h2>
                     <form id="payment-form">
                         <div class="input-group">
                             <label for="mpesa-phone">M-Pesa Phone Number <span style="font-size: 12px; color: #64748b; font-weight: normal;">(Format: 254XXXXXXXXX)</span></label>
@@ -185,7 +185,7 @@
                             <label for="mpesa-amount">Amount (KES)</label>
                             <input type="number" id="mpesa-amount" placeholder="100" required min="1">
                         </div>
-                        <button type="submit" class="primary-btn" style="width: 100%; background-color: #22c55e; border-color: #16a34a;">Trigger STK Push</button>
+                        <button type="submit" class="primary-btn" style="width: 100%; background-color: #22c55e; border-color: #16a34a; padding: 14px; font-size: 16px;">Trigger STK Push</button>
                     </form>
                     <p id="payment-status-msg" style="margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold;"></p>
                 </div>
