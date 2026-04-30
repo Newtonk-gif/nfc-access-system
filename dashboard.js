@@ -681,6 +681,11 @@ async function handlePaymentSubmit(e) {
             body: JSON.stringify({ phone, amount })
         });
 
+        // Catch 404s, 500s, or CORS errors before attempting to parse JSON
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`HTTP Error ${response.status}: ${errText}`);
+        }
         const data = await response.json();
 
         if (data.success) {
