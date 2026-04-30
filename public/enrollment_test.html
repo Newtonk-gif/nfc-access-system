@@ -69,6 +69,15 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+
+    /* --- Mobile Overrides --- */
+    @media screen and (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .btn-row { flex-direction: column; width: 100%; }
+      .btn { width: 100%; margin-bottom: 8px; }
+      .uid-box { font-size: 16px; word-break: break-all; }
+      body { padding: 15px; }
+    }
   </style>
 </head>
 <body>
@@ -328,6 +337,9 @@ window.saveUser = async function() {
 
     if (!result.success) {
         log("Backend Save Failed: " + result.error, "err");
+        if (result.error.includes('already registered')) {
+            showDuplicateWarn(capturedUID);
+        }
         throw new Error(result.error);
     }
 

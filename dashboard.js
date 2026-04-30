@@ -9,8 +9,6 @@ let logSearchInput;
 let exportCsvBtn;
 let exportStartDate;
 let exportEndDate;
-let currentLogsPage = 1;
-const logsPerPage = 10;
 let allLogsData = [];
 let currentUsersPage = 1;
 const usersPerPage = 10;
@@ -18,9 +16,12 @@ let allUsersData = [];
 let activityChart = null;
 let statusPieChart = null;
 let locationChart = null;
+let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
+// Firebase Functions URL for M-Pesa (Replace with your actual deployed URL)
+const MPESA_CLOUD_FUNCTION_URL = 'https://us-central1-<YOUR-PROJECT-ID>.cloudfunctions.net/initiateMpesaPayment';
 
 function initDashboard() {
     console.log("Dashboard has been initialized.");
@@ -42,6 +43,11 @@ function initDashboard() {
     exportCsvBtn = document.getElementById('export-csv-btn');
     exportStartDate = document.getElementById('export-start-date');
     exportEndDate = document.getElementById('export-end-date');
+    
+    paymentForm = document.getElementById('payment-form');
+    paymentPhoneInput = document.getElementById('mpesa-phone');
+    paymentAmountInput = document.getElementById('mpesa-amount');
+    paymentStatusMsg = document.getElementById('payment-status-msg');
     
     // Nav switching
     const navItems = document.querySelectorAll('.nav-item');
@@ -93,7 +99,6 @@ function initDashboard() {
     // Log Search Listener
     if (logSearchInput) {
         logSearchInput.addEventListener('input', () => {
-            currentLogsPage = 1; // Reset to first page on search
             renderLogsTable();
         });
     }
@@ -106,17 +111,20 @@ function initDashboard() {
     // Date Filter Listeners
     if (exportStartDate) {
         exportStartDate.addEventListener('change', () => {
-            currentLogsPage = 1;
             renderLogsTable();
             updateAnalyticsChart();
         });
     }
     if (exportEndDate) {
         exportEndDate.addEventListener('change', () => {
-            currentLogsPage = 1;
             renderLogsTable();
             updateAnalyticsChart();
         });
+    }
+    
+    // Payment Form Listener
+    if (paymentForm) {
+        paymentForm.addEventListener('submit', handlePaymentSubmit);
     }
 
     // Load access logs initially to display existing scan history
@@ -313,7 +321,7 @@ function fetchAndRenderLogs() {
         return;
     }
     
-    fetch(`${API_BASE_URL}/api/access-logs?limit=200`)
+    fetch(`${API_BASE_URL}/api/access-logs?limit=500`)
         .then(res => res.json())
         .then(response => {
             console.log("Backend API Response (Logs):", response);
@@ -355,19 +363,16 @@ function renderLogsTable() {
     // Display a friendly message if there is no data
     if (filteredLogs.length === 0) {
         logTable.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 1rem;">No recent activity found.</td></tr>';
-        updatePaginationControls(0);
+        const existingPagination = document.getElementById('pagination-controls');
+        if (existingPagination) existingPagination.remove();
         return;
     }
 
-    const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-    if (currentLogsPage > totalPages) currentLogsPage = totalPages;
-
-    const startIndex = (currentLogsPage - 1) * logsPerPage;
-    const endIndex = startIndex + logsPerPage;
-    const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+    const existingPagination = document.getElementById('pagination-controls');
+    if (existingPagination) existingPagination.remove();
 
     // Response is newest-first. Appending them preserves the order.
-    paginatedLogs.forEach(log => {
+    filteredLogs.forEach(log => {
         // Handle timestamp (supports both integer milliseconds and ISO strings)
         const time = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'N/A';
         
@@ -396,45 +401,8 @@ function renderLogsTable() {
         `;
         logTable.appendChild(row);
     });
-
-    updatePaginationControls(filteredLogs.length);
 }
 
-function updatePaginationControls(totalItems) {
-    let paginationDiv = document.getElementById('pagination-controls');
-    const container = logTable.closest('.table-container');
-    
-    if (!container) return;
-
-    if (!paginationDiv) {
-        paginationDiv = document.createElement('div');
-        paginationDiv.id = 'pagination-controls';
-        paginationDiv.className = 'pagination-container';
-        container.appendChild(paginationDiv);
-    }
-
-    const totalPages = Math.ceil(totalItems / logsPerPage) || 1;
-
-    paginationDiv.innerHTML = `
-        <button id="prev-page" class="secondary-btn" ${currentLogsPage === 1 ? 'disabled' : ''}>Previous</button>
-        <span class="page-info">Page ${currentLogsPage} of ${totalPages}</span>
-        <button id="next-page" class="secondary-btn" ${currentLogsPage === totalPages || totalPages === 0 ? 'disabled' : ''}>Next</button>
-    `;
-
-    document.getElementById('prev-page').addEventListener('click', () => {
-        if (currentLogsPage > 1) {
-            currentLogsPage--;
-            renderLogsTable();
-        }
-    });
-
-    document.getElementById('next-page').addEventListener('click', () => {
-        if (currentLogsPage < totalPages) {
-            currentLogsPage++;
-            renderLogsTable();
-        }
-    });
-}
 
 // --- User Management Actions ---
 function editUser(userId) {
@@ -681,8 +649,60 @@ function updateAnalyticsChart() {
     }
 }
 
+// --- Payment Functions ---
+async function handlePaymentSubmit(e) {
+    e.preventDefault();
+    if (!paymentPhoneInput || !paymentAmountInput) return;
+
+    const phone = paymentPhoneInput.value.trim();
+    const amount = paymentAmountInput.value.trim();
+
+    if (!/^254\d{9}$/.test(phone)) {
+        showPaymentStatus('Invalid phone format. Please use 254XXXXXXXXX.', 'error');
+        return;
+    }
+
+    if (isNaN(amount) || amount < 1) {
+        showPaymentStatus('Please enter a valid amount.', 'error');
+        return;
+    }
+
+    showPaymentStatus('Initiating M-Pesa prompt... please check your phone.', 'info');
+
+    try {
+        const response = await fetch(MPESA_CLOUD_FUNCTION_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, amount })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showPaymentStatus('STK Push sent successfully! Enter your PIN on your phone.', 'success');
+            paymentForm.reset();
+        } else {
+            showPaymentStatus(`Failed: ${data.error || 'Unknown error occurred'}`, 'error');
+        }
+    } catch (err) {
+        console.error('Payment initiation error:', err);
+        showPaymentStatus('Error connecting to the payment service.', 'error');
+    }
+}
+
+function showPaymentStatus(message, type) {
+    if (!paymentStatusMsg) return;
+    paymentStatusMsg.textContent = message;
+    
+    paymentStatusMsg.className = 'payment-status ' + type;
+    if (type === 'error') paymentStatusMsg.style.color = '#ef4444';
+    else if (type === 'success') paymentStatusMsg.style.color = '#22c55e';
+    else paymentStatusMsg.style.color = '#3b82f6';
+}
+
 // Export functions to window for browser console testing
 window.editUser = editUser;
 window.deleteUser = deleteUser;
 window.closeEditModal = closeEditModal;
 window.exportLogsToCSV = exportLogsToCSV;
+window.handlePaymentSubmit = handlePaymentSubmit;
