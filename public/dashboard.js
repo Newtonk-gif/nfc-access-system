@@ -19,6 +19,8 @@ let locationChart = null;
 let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
 let paymentTagForm, paymentTagUidInput, paymentTagAmountInput, paymentTagStatusMsg;
 let paymentHistoryTable, paymentHistoryBody;
+let startNfcScanBtn;
+let isListeningForPayment = false;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
@@ -59,6 +61,7 @@ function initDashboard() {
     paymentTagUidInput = document.getElementById('mpesa-tag-uid');
     paymentTagAmountInput = document.getElementById('mpesa-tag-amount');
     paymentTagStatusMsg = document.getElementById('payment-tag-status-msg');
+    startNfcScanBtn = document.getElementById('start-nfc-scan-btn');
     
     // Nav switching
     const navItems = document.querySelectorAll('.nav-item');
@@ -75,6 +78,13 @@ function initDashboard() {
             userManagementSection.classList.add('hidden');
             if (enrollmentSection) enrollmentSection.classList.add('hidden');
             if (paymentSection) paymentSection.classList.add('hidden');
+
+            // Reset NFC listening state
+            isListeningForPayment = false;
+            if (startNfcScanBtn) {
+                startNfcScanBtn.textContent = 'Start Scan';
+                startNfcScanBtn.disabled = false;
+            }
 
             if (target.includes('user')) {
                 userManagementSection.classList.remove('hidden');
@@ -146,6 +156,10 @@ function initDashboard() {
         paymentTagForm.addEventListener('submit', handleTagPaymentSubmit);
     }
 
+    if (startNfcScanBtn) {
+        startNfcScanBtn.addEventListener('click', startNfcScan);
+    }
+
     // Load access logs initially to display existing scan history
     fetchAndRenderLogs();
     
@@ -157,10 +171,17 @@ function initDashboard() {
         
         // Auto-fill UID for tap-to-pay if payment section is active
         if (paymentSection && !paymentSection.classList.contains('hidden') && paymentTagUidInput) {
-            const uid = newLog.tagUID || newLog.tagUid;
-            if (uid) {
-                paymentTagUidInput.value = uid;
-                showTagPaymentStatus('Tag detected. Enter amount and submit.', 'info');
+            if (isListeningForPayment) {
+                const uid = newLog.tagUID || newLog.tagUid;
+                if (uid) {
+                    paymentTagUidInput.value = uid;
+                    isListeningForPayment = false;
+                    if (startNfcScanBtn) {
+                        startNfcScanBtn.textContent = 'Start Scan';
+                        startNfcScanBtn.disabled = false;
+                    }
+                    showTagPaymentStatus('Tag detected. Enter amount and submit.', 'success');
+                }
             }
         }
     });
@@ -902,6 +923,16 @@ function showTagPaymentStatus(message, type) {
     else paymentTagStatusMsg.style.color = '#3b82f6';
 }
 
+function startNfcScan() {
+    isListeningForPayment = true;
+    if (paymentTagUidInput) paymentTagUidInput.value = '';
+    if (startNfcScanBtn) {
+        startNfcScanBtn.textContent = '⏳ Listening...';
+        startNfcScanBtn.disabled = true;
+    }
+    showTagPaymentStatus('Please tap the NFC card on the reader now.', 'info');
+}
+
 // Export functions to window for browser console testing
 window.editUser = editUser;
 window.deleteUser = deleteUser;
@@ -909,3 +940,4 @@ window.closeEditModal = closeEditModal;
 window.exportLogsToCSV = exportLogsToCSV;
 window.handlePaymentSubmit = handlePaymentSubmit;
 window.handleTagPaymentSubmit = handleTagPaymentSubmit;
+window.startNfcScan = startNfcScan;

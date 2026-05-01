@@ -178,21 +178,44 @@
 
             <!-- Payment Section -->
             <div id="payment-section" class="hidden" style="padding: 40px; display: flex; flex-direction: column; align-items: center; height: 100%; gap: 30px;">
-                <!-- Payment Form -->
-                <div style="width: 100%; max-width: 500px; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                    <h2 style="margin-bottom: 20px; text-align: center; color: #1e293b;">Make a Payment (M-Pesa)</h2>
-                    <form id="payment-form">
-                        <div class="input-group">
-                            <label for="mpesa-phone">M-Pesa Phone Number <span style="font-size: 12px; color: #64748b; font-weight: normal;">(Format: 254XXXXXXXXX)</span></label>
-                            <input type="text" id="mpesa-phone" placeholder="254700000000" required>
-                        </div>
-                        <div class="input-group">
-                            <label for="mpesa-amount">Amount (KES)</label>
-                            <input type="number" id="mpesa-amount" placeholder="100" required min="1">
-                        </div>
-                        <button type="submit" class="primary-btn" style="width: 100%; background-color: #22c55e; border-color: #16a34a; padding: 14px; font-size: 16px;">Trigger STK Push</button>
-                    </form>
-                    <p id="payment-status-msg" style="margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold;"></p>
+                <!-- Payment Forms Container -->
+                <div style="display: flex; gap: 20px; width: 100%; max-width: 900px; justify-content: center; flex-wrap: wrap;">
+                    <!-- Manual Payment Form -->
+                    <div style="flex: 1; min-width: 300px; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <h2 style="margin-bottom: 20px; text-align: center; color: #1e293b;">Manual Payment</h2>
+                        <form id="payment-form">
+                            <div class="input-group">
+                                <label for="mpesa-phone">M-Pesa Phone Number <span style="font-size: 12px; color: #64748b; font-weight: normal;">(Format: 254XXXXXXXXX)</span></label>
+                                <input type="text" id="mpesa-phone" placeholder="254700000000" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="mpesa-amount">Amount (KES)</label>
+                                <input type="number" id="mpesa-amount" placeholder="100" required min="1">
+                            </div>
+                            <button type="submit" class="primary-btn" style="width: 100%; background-color: #22c55e; border-color: #16a34a; padding: 14px; font-size: 16px;">Trigger STK Push</button>
+                        </form>
+                        <p id="payment-status-msg" style="margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold;"></p>
+                    </div>
+                    
+                    <!-- Tap to Pay Form -->
+                    <div style="flex: 1; min-width: 300px; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <h2 style="margin-bottom: 20px; text-align: center; color: #1e293b;">Pay via NFC Tag</h2>
+                        <form id="payment-tag-form" onsubmit="handleTagPaymentSubmit(event); return false;">
+                            <div class="input-group">
+                                <label for="mpesa-tag-uid">NFC Tag UID <span style="font-size: 12px; color: #64748b; font-weight: normal;">(Tap card to auto-fill)</span></label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" id="mpesa-tag-uid" placeholder="Click 'Start Scan' to read tag" required readonly style="background-color: #f8fafc; flex: 1;">
+                                    <button type="button" id="start-nfc-scan-btn" onclick="startNfcScan()" class="secondary-btn" style="white-space: nowrap; padding: 0 15px;">Start Scan</button>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="mpesa-tag-amount">Amount (KES)</label>
+                                <input type="number" id="mpesa-tag-amount" placeholder="100" required min="1">
+                            </div>
+                            <button type="submit" class="primary-btn" style="width: 100%; background-color: #3b82f6; border-color: #2563eb; padding: 14px; font-size: 16px;">Pay with Tag</button>
+                        </form>
+                        <p id="payment-tag-status-msg" style="margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold;"></p>
+                    </div>
                 </div>
                 
                 <!-- Payment Summary Cards -->
