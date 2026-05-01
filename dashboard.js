@@ -19,6 +19,7 @@ let locationChart = null;
 let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
 let paymentTagForm, paymentTagUidInput, paymentTagAmountInput, paymentTagStatusMsg;
 let startNfcScanBtn;
+let cancelNfcScanBtn;
 let isListeningForPayment = false;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
@@ -59,6 +60,7 @@ function initDashboard() {
     paymentTagAmountInput = document.getElementById('mpesa-tag-amount');
     paymentTagStatusMsg = document.getElementById('payment-tag-status-msg');
     startNfcScanBtn = document.getElementById('start-nfc-scan-btn');
+    cancelNfcScanBtn = document.getElementById('cancel-nfc-scan-btn');
     
     // Nav switching
     const navItems = document.querySelectorAll('.nav-item');
@@ -82,6 +84,9 @@ function initDashboard() {
                 startNfcScanBtn.textContent = 'Start Scan';
                 startNfcScanBtn.disabled = false;
             }
+        if (cancelNfcScanBtn) {
+            cancelNfcScanBtn.style.display = 'none';
+        }
 
             if (target.includes('user')) {
                 userManagementSection.classList.remove('hidden');
@@ -176,6 +181,9 @@ function initDashboard() {
                         startNfcScanBtn.textContent = 'Start Scan';
                         startNfcScanBtn.disabled = false;
                     }
+                if (cancelNfcScanBtn) {
+                    cancelNfcScanBtn.style.display = 'none';
+                }
                     showTagPaymentStatus('Tag detected. Enter amount and submit.', 'success');
                 }
             }
@@ -850,7 +858,22 @@ function startNfcScan() {
         startNfcScanBtn.textContent = '⏳ Listening...';
         startNfcScanBtn.disabled = true;
     }
+    if (cancelNfcScanBtn) {
+        cancelNfcScanBtn.style.display = 'block';
+    }
     showTagPaymentStatus('Please tap the NFC card on the reader now.', 'info');
+}
+
+function cancelNfcScan() {
+    isListeningForPayment = false;
+    if (startNfcScanBtn) {
+        startNfcScanBtn.textContent = 'Start Scan';
+        startNfcScanBtn.disabled = false;
+    }
+    if (cancelNfcScanBtn) {
+        cancelNfcScanBtn.style.display = 'none';
+    }
+    showTagPaymentStatus('Scan cancelled.', 'error');
 }
 
 // Export functions to window for browser console testing
@@ -861,3 +884,4 @@ window.exportLogsToCSV = exportLogsToCSV;
 window.handlePaymentSubmit = handlePaymentSubmit;
 window.handleTagPaymentSubmit = handleTagPaymentSubmit;
 window.startNfcScan = startNfcScan;
+window.cancelNfcScan = cancelNfcScan;
