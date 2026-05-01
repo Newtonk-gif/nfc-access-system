@@ -17,6 +17,7 @@ let activityChart = null;
 let statusPieChart = null;
 let locationChart = null;
 let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
+let paymentTagForm, paymentTagUidInput, paymentTagAmountInput, paymentTagStatusMsg;
 let paymentHistoryTable, paymentHistoryBody;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
@@ -53,6 +54,11 @@ function initDashboard() {
     paymentStatusMsg = document.getElementById('payment-status-msg');
     paymentHistoryTable = document.getElementById('payment-history-table');
     paymentHistoryBody = document.getElementById('payment-history-body');
+
+    paymentTagForm = document.getElementById('payment-tag-form');
+    paymentTagUidInput = document.getElementById('mpesa-tag-uid');
+    paymentTagAmountInput = document.getElementById('mpesa-tag-amount');
+    paymentTagStatusMsg = document.getElementById('payment-tag-status-msg');
     
     // Nav switching
     const navItems = document.querySelectorAll('.nav-item');
@@ -136,6 +142,9 @@ function initDashboard() {
     if (paymentForm) {
         paymentForm.addEventListener('submit', handlePaymentSubmit);
     }
+    if (paymentTagForm) {
+        paymentTagForm.addEventListener('submit', handleTagPaymentSubmit);
+    }
 
     // Load access logs initially to display existing scan history
     fetchAndRenderLogs();
@@ -145,6 +154,15 @@ function initDashboard() {
     socket.on('new_access_log', (newLog) => {
         console.log("⚡ Real-time update received via WebSocket!");
         fetchAndRenderLogs(); // Instantly refresh the table
+        
+        // Auto-fill UID for tap-to-pay if payment section is active
+        if (paymentSection && !paymentSection.classList.contains('hidden') && paymentTagUidInput) {
+            const uid = newLog.tagUID || newLog.tagUid;
+            if (uid) {
+                paymentTagUidInput.value = uid;
+                showTagPaymentStatus('Tag detected. Enter amount and submit.', 'info');
+            }
+        }
     });
 
     console.log("Dashboard event listeners initialized");
@@ -809,9 +827,85 @@ function renderPaymentHistory() {
     });
 }
 
+// --- Tag Payment Functions ---
+async function handleTagPaymentSubmit(e) {
+    e.preventDefault();
+    if (!paymentTagUidInput || !paymentTagAmountInput) return;
+
+    const tagUID = paymentTagUidInput.value.trim();
+    const amount = paymentTagAmountInput.value.trim();
+
+    if (!tagUID) {
+        showTagPaymentStatus('Please provide a Tag UID.', 'error');
+        return;
+    }
+
+    if (isNaN(amount) || amount < 1) {
+        showTagPaymentStatus('Please enter a valid amount.', 'error');
+        return;
+    }
+
+    const submitBtn = paymentTagForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Processing...';
+
+    showTagPaymentStatus('Looking up user and initiating M-Pesa...', 'info');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/mpesa/pay-via-tag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tagUID, amount })
+        });
+
+        if (!response.ok) {
+            let errText = await response.text();
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson.error) errText = errJson.error;
+            } catch (e) { /* ignore parse error */ }
+            throw new Error(errText || `HTTP ${response.status} Error`);
+        }
+        const data = await response.json();
+
+        if (data.success) {
+            showTagPaymentStatus(`STK Push sent to ${data.phone}! Enter PIN on phone.`, 'success');
+            paymentTagForm.reset();
+            paymentTagUidInput.value = ''; // Explicitly clear the UID field
+            
+            // Clear the success message after 5 seconds to reset the UI for the next tap
+            setTimeout(() => {
+                if (paymentTagStatusMsg.textContent.includes('STK Push sent')) {
+                    paymentTagStatusMsg.textContent = '';
+                }
+            }, 5000);
+        } else {
+            showTagPaymentStatus(`Failed: ${data.error || 'Unknown error occurred'}`, 'error');
+        }
+    } catch (err) {
+        console.error('Tag Payment error:', err);
+        showTagPaymentStatus(`Error: ${err.message}`, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+    }
+}
+
+function showTagPaymentStatus(message, type) {
+    if (!paymentTagStatusMsg) return;
+    paymentTagStatusMsg.textContent = message;
+    
+    paymentTagStatusMsg.className = 'payment-status ' + type;
+    if (type === 'error') paymentTagStatusMsg.style.color = '#ef4444';
+    else if (type === 'success') paymentTagStatusMsg.style.color = '#22c55e';
+    else paymentTagStatusMsg.style.color = '#3b82f6';
+}
+
 // Export functions to window for browser console testing
 window.editUser = editUser;
 window.deleteUser = deleteUser;
 window.closeEditModal = closeEditModal;
 window.exportLogsToCSV = exportLogsToCSV;
 window.handlePaymentSubmit = handlePaymentSubmit;
+window.handleTagPaymentSubmit = handleTagPaymentSubmit;
