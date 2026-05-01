@@ -22,6 +22,8 @@ let paymentHistoryTable, paymentHistoryBody;
 let startNfcScanBtn;
 let cancelNfcScanBtn;
 let isListeningForPayment = false;
+let nfcScanTimeout;
+let nfcCountdownInterval;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
@@ -83,6 +85,8 @@ function initDashboard() {
 
             // Reset NFC listening state
             isListeningForPayment = false;
+            clearTimeout(nfcScanTimeout);
+            clearInterval(nfcCountdownInterval);
             if (startNfcScanBtn) {
                 startNfcScanBtn.textContent = 'Start Scan';
                 startNfcScanBtn.disabled = false;
@@ -184,6 +188,8 @@ function initDashboard() {
                 if (uid) {
                     paymentTagUidInput.value = uid;
                     isListeningForPayment = false;
+                    clearTimeout(nfcScanTimeout);
+                    clearInterval(nfcCountdownInterval);
                     if (startNfcScanBtn) {
                         startNfcScanBtn.textContent = 'Start Scan';
                         startNfcScanBtn.disabled = false;
@@ -936,6 +942,8 @@ function showTagPaymentStatus(message, type) {
 
 function startNfcScan() {
     isListeningForPayment = true;
+    clearTimeout(nfcScanTimeout);
+    clearInterval(nfcCountdownInterval);
     if (paymentTagUidInput) paymentTagUidInput.value = '';
     if (startNfcScanBtn) {
         startNfcScanBtn.textContent = '⏳ Listening...';
@@ -944,11 +952,31 @@ function startNfcScan() {
     if (cancelNfcScanBtn) {
         cancelNfcScanBtn.disabled = false;
     }
-    showTagPaymentStatus('Please tap the NFC card on the reader now.', 'info');
+    
+    let timeLeft = 30;
+    showTagPaymentStatus(`Please tap the NFC card on the reader now. (${timeLeft}s remaining)`, 'info');
+
+    nfcCountdownInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0 && isListeningForPayment) {
+            showTagPaymentStatus(`Please tap the NFC card on the reader now. (${timeLeft}s remaining)`, 'info');
+        }
+    }, 1000);
+
+    // Auto-cancel if no card is tapped within 30 seconds
+    nfcScanTimeout = setTimeout(() => {
+        clearInterval(nfcCountdownInterval);
+        if (isListeningForPayment) {
+            cancelNfcScan();
+            showTagPaymentStatus('Scan timed out. No card was tapped.', 'error');
+        }
+    }, 30000);
 }
 
 function cancelNfcScan() {
     isListeningForPayment = false;
+    clearTimeout(nfcScanTimeout);
+    clearInterval(nfcCountdownInterval);
     if (paymentTagUidInput) paymentTagUidInput.value = '';
     if (startNfcScanBtn) {
         startNfcScanBtn.textContent = 'Start Scan';

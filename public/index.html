@@ -205,8 +205,8 @@
                                 <label for="mpesa-tag-uid">NFC Tag UID <span style="font-size: 12px; color: #64748b; font-weight: normal;">(Tap card to auto-fill)</span></label>
                                 <div style="display: flex; gap: 10px;">
                                     <input type="text" id="mpesa-tag-uid" placeholder="Click 'Start Scan' to read tag" required readonly style="background-color: #f8fafc; flex: 1;">
-                                    <button type="button" id="start-nfc-scan-btn" class="secondary-btn" style="white-space: nowrap; padding: 0 15px;">Start Scan</button>
-                                    <button type="button" id="cancel-nfc-scan-btn" class="cancel-btn" style="white-space: nowrap; padding: 0 15px;" disabled>Cancel</button>
+                                    <button type="button" id="start-nfc-scan-btn" onclick="startNfcScan()" class="secondary-btn" style="white-space: nowrap; padding: 0 15px;">Start Scan</button>
+                                    <button type="button" id="cancel-nfc-scan-btn" onclick="cancelNfcScan()" class="cancel-btn" style="white-space: nowrap; padding: 0 15px;" disabled>Cancel</button>
                                 </div>
                             </div>
                             <div class="input-group">
@@ -260,8 +260,8 @@
         </main>
     </div>
 
-    <script src="auth.js"></script>
-    <script src="dashboard.js"></script>
+    <script src="auth.js?v=3.0"></script>
+    <script src="dashboard.js?v=3.0"></script>
     <script>
         // This ensures the dashboard's navigation and event listeners are set up
         // as soon as the page content is ready.
