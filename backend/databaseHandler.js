@@ -213,6 +213,15 @@ class DatabaseHandler {
       const tag = await this.getNFCTag(tagUID);
       if (tag) {
         logEntry.userId = tag.userId;
+        
+        // Fetch user info to populate rich log details for the dashboard
+        const user = await this.getUser(tag.userId);
+        if (user) {
+          logEntry.userName = user.name || null;
+          logEntry.phone = user.phone || null;
+          logEntry.role = user.role || null;
+          logEntry.department = user.department || null;
+        }
       }
 
       // Create log entry with auto-generated ID in Realtime Database
@@ -324,6 +333,71 @@ class DatabaseHandler {
       console.log(`Listener removed for path: ${path}`);
     } catch (error) {
       console.error('Error removing listener:', error);
+      throw error;
+    }
+  }
+
+  // ===== PAYMENT MANAGEMENT =====
+
+  /**
+   * Save M-Pesa payment record
+   * @param {object} paymentData - Payment data from M-Pesa callback
+   */
+  async savePayment(paymentData) {
+    try {
+      const paymentRecord = {
+        ...paymentData,
+        createdAt: new Date().toISOString()
+      };
+      
+      await firestore.collection('payments').doc(paymentData.transactionId).set(paymentRecord);
+      console.log(`Payment ${paymentData.transactionId} saved successfully in Firestore`);
+      return { success: true, transactionId: paymentData.transactionId };
+    } catch (error) {
+      console.error('Error saving payment:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all payments
+   * @param {number} limit - Number of recent payments to fetch
+   */
+  async getAllPayments(limit = 50) {
+    try {
+      const snapshot = await firestore.collection('payments')
+        .orderBy('createdAt', 'desc')
+        .limit(limit)
+        .get();
+      
+      if (!snapshot.empty) {
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      } else {
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get payment by transaction ID
+   * @param {string} transactionId - M-Pesa transaction ID
+   */
+  async getPayment(transactionId) {
+    try {
+      const doc = await firestore.collection('payments').doc(transactionId).get();
+      if (doc.exists) {
+        return doc.data();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('Error getting payment:', error);
       throw error;
     }
   }

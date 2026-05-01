@@ -3,7 +3,7 @@ let logTable;
 let userTableBody;
 let userManagementSection, liveMonitorSection;
 let enrollmentSection, paymentSection;
-let editModal, editForm, editUserNameInput, editUserRoleInput, editUserDeptInput, editUserActiveInput, currentEditUserId;
+let editModal, editForm, editUserNameInput, editUserPhoneInput, editUserRoleInput, editUserDeptInput, editUserActiveInput, currentEditUserId;
 let userSearchInput;
 let logSearchInput;
 let exportCsvBtn;
@@ -17,6 +17,7 @@ let activityChart = null;
 let statusPieChart = null;
 let locationChart = null;
 let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
+let paymentTagForm, paymentTagUidInput, paymentTagAmountInput, paymentTagStatusMsg;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
@@ -36,6 +37,7 @@ function initDashboard() {
     editModal = document.getElementById('edit-modal');
     editForm = document.getElementById('edit-form');
     editUserNameInput = document.getElementById('edit-user-name');
+    editUserPhoneInput = document.getElementById('edit-user-phone');
     editUserRoleInput = document.getElementById('edit-user-role');
     editUserDeptInput = document.getElementById('edit-user-dept');
     editUserActiveInput = document.getElementById('edit-user-active');
@@ -49,6 +51,11 @@ function initDashboard() {
     paymentPhoneInput = document.getElementById('mpesa-phone');
     paymentAmountInput = document.getElementById('mpesa-amount');
     paymentStatusMsg = document.getElementById('payment-status-msg');
+
+    paymentTagForm = document.getElementById('payment-tag-form');
+    paymentTagUidInput = document.getElementById('mpesa-tag-uid');
+    paymentTagAmountInput = document.getElementById('mpesa-tag-amount');
+    paymentTagStatusMsg = document.getElementById('payment-tag-status-msg');
     
     // Nav switching
     const navItems = document.querySelectorAll('.nav-item');
@@ -131,6 +138,9 @@ function initDashboard() {
     if (paymentForm) {
         paymentForm.addEventListener('submit', handlePaymentSubmit);
     }
+    if (paymentTagForm) {
+        paymentTagForm.addEventListener('submit', handleTagPaymentSubmit);
+    }
 
     // Load access logs initially to display existing scan history
     fetchAndRenderLogs();
@@ -140,6 +150,15 @@ function initDashboard() {
     socket.on('new_access_log', (newLog) => {
         console.log("⚡ Real-time update received via WebSocket!");
         fetchAndRenderLogs(); // Instantly refresh the table
+        
+        // Auto-fill UID for tap-to-pay if payment section is active
+        if (paymentSection && !paymentSection.classList.contains('hidden') && paymentTagUidInput) {
+            const uid = newLog.tagUID || newLog.tagUid;
+            if (uid) {
+                paymentTagUidInput.value = uid;
+                showTagPaymentStatus('Tag detected. Enter amount and submit.', 'info');
+            }
+        }
     });
 
     console.log("Dashboard event listeners initialized");
@@ -218,6 +237,7 @@ function renderUserTable() {
         row.innerHTML = `
             <td>${user.id}</td>
             <td>${user.name}</td>
+            <td>${user.phone || '-'}</td>
             <td style="text-transform: capitalize;">${user.role || 'N/A'}</td>
             <td>${user.department || 'N/A'}</td>
             <td>${user.uid || 'No UID'}</td>
@@ -399,6 +419,7 @@ function renderLogsTable() {
             <td style="text-transform: capitalize;">${log.role || 'N/A'}</td>
             <td>${log.department || 'N/A'}</td>
             <td style="font-family: monospace;">${log.tagUid || log.tagUID || 'N/A'}</td>
+            <td>${log.phone || '-'}</td>
             <td style="text-transform: capitalize;">${log.eventType || 'N/A'}</td>
             <td>${log.location || 'Unknown'}</td>
             <td>${log.readerId || 'N/A'}</td>
@@ -416,6 +437,7 @@ function editUser(userId) {
     
     currentEditUserId = userId;
     if (editUserNameInput) editUserNameInput.value = user.name;
+    if (editUserPhoneInput) editUserPhoneInput.value = user.phone || '';
     if (editUserRoleInput) editUserRoleInput.value = user.role || 'student';
     if (editUserDeptInput) editUserDeptInput.value = user.department || '';
     if (editUserActiveInput) editUserActiveInput.checked = user.active !== false; // Default to true if undefined
@@ -433,12 +455,14 @@ function handleEditSubmit(e) {
     if (!currentEditUserId) return;
     
     const newName = editUserNameInput.value;
+    const newPhone = editUserPhoneInput ? editUserPhoneInput.value : undefined;
     const newRole = editUserRoleInput ? editUserRoleInput.value : undefined;
     const newDept = editUserDeptInput ? editUserDeptInput.value : undefined;
     const newActive = editUserActiveInput ? editUserActiveInput.checked : undefined;
 
     if (newName && newName.trim() !== "") {
         const payload = { name: newName.trim() };
+        if (newPhone !== undefined) payload.phone = newPhone.trim();
         if (newRole !== undefined) payload.role = newRole;
         if (newDept !== undefined) payload.department = newDept.trim();
         if (newActive !== undefined) payload.active = newActive;
@@ -490,7 +514,7 @@ function exportLogsToCSV() {
     }
 
     // Define CSV Headers
-    const headers = ["Status", "User", "Role", "Department", "Tag UID", "Event Type", "Location", "Reader ID", "Time"];
+    const headers = ["Status", "User", "Role", "Department", "Tag UID", "Phone", "Event Type", "Location", "Reader ID", "Time"];
     const csvRows = [headers.join(',')];
 
     // Map data to CSV rows
@@ -511,6 +535,7 @@ function exportLogsToCSV() {
             `"${log.role || 'N/A'}"`,
             `"${log.department || 'N/A'}"`,
             `"${uid}"`,
+            `"${log.phone || '-'}"`,
             `"${log.eventType || 'N/A'}"`,
             `"${log.location || 'Unknown'}"`,
             `"${log.readerId || 'N/A'}"`,
@@ -672,6 +697,11 @@ async function handlePaymentSubmit(e) {
         return;
     }
 
+    const submitBtn = paymentForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Processing...';
+
     showPaymentStatus('Initiating M-Pesa prompt... please check your phone.', 'info');
 
     try {
@@ -701,6 +731,9 @@ async function handlePaymentSubmit(e) {
     } catch (err) {
         console.error('Payment initiation error:', err);
         showPaymentStatus(`Error: ${err.message}`, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
     }
 }
 
@@ -714,9 +747,85 @@ function showPaymentStatus(message, type) {
     else paymentStatusMsg.style.color = '#3b82f6';
 }
 
+// --- Tag Payment Functions ---
+async function handleTagPaymentSubmit(e) {
+    e.preventDefault();
+    if (!paymentTagUidInput || !paymentTagAmountInput) return;
+
+    const tagUID = paymentTagUidInput.value.trim();
+    const amount = paymentTagAmountInput.value.trim();
+
+    if (!tagUID) {
+        showTagPaymentStatus('Please provide a Tag UID.', 'error');
+        return;
+    }
+
+    if (isNaN(amount) || amount < 1) {
+        showTagPaymentStatus('Please enter a valid amount.', 'error');
+        return;
+    }
+
+    const submitBtn = paymentTagForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Processing...';
+
+    showTagPaymentStatus('Looking up user and initiating M-Pesa...', 'info');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/mpesa/pay-via-tag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tagUID, amount })
+        });
+
+        if (!response.ok) {
+            let errText = await response.text();
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson.error) errText = errJson.error;
+            } catch (e) { /* ignore parse error */ }
+            throw new Error(errText || `HTTP ${response.status} Error`);
+        }
+        const data = await response.json();
+
+        if (data.success) {
+            showTagPaymentStatus(`STK Push sent to ${data.phone}! Enter PIN on phone.`, 'success');
+            paymentTagForm.reset();
+            paymentTagUidInput.value = ''; // Explicitly clear the UID field
+            
+            // Clear the success message after 5 seconds to reset the UI for the next tap
+            setTimeout(() => {
+                if (paymentTagStatusMsg.textContent.includes('STK Push sent')) {
+                    paymentTagStatusMsg.textContent = '';
+                }
+            }, 5000);
+        } else {
+            showTagPaymentStatus(`Failed: ${data.error || 'Unknown error occurred'}`, 'error');
+        }
+    } catch (err) {
+        console.error('Tag Payment error:', err);
+        showTagPaymentStatus(`Error: ${err.message}`, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+    }
+}
+
+function showTagPaymentStatus(message, type) {
+    if (!paymentTagStatusMsg) return;
+    paymentTagStatusMsg.textContent = message;
+    
+    paymentTagStatusMsg.className = 'payment-status ' + type;
+    if (type === 'error') paymentTagStatusMsg.style.color = '#ef4444';
+    else if (type === 'success') paymentTagStatusMsg.style.color = '#22c55e';
+    else paymentTagStatusMsg.style.color = '#3b82f6';
+}
+
 // Export functions to window for browser console testing
 window.editUser = editUser;
 window.deleteUser = deleteUser;
 window.closeEditModal = closeEditModal;
 window.exportLogsToCSV = exportLogsToCSV;
 window.handlePaymentSubmit = handlePaymentSubmit;
+window.handleTagPaymentSubmit = handleTagPaymentSubmit;

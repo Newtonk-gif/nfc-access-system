@@ -3,7 +3,7 @@ let logTable;
 let userTableBody;
 let userManagementSection, liveMonitorSection;
 let enrollmentSection, paymentSection;
-let editModal, editForm, editUserNameInput, editUserRoleInput, editUserDeptInput, editUserActiveInput, currentEditUserId;
+let editModal, editForm, editUserNameInput, editUserPhoneInput, editUserRoleInput, editUserDeptInput, editUserActiveInput, currentEditUserId;
 let userSearchInput;
 let logSearchInput;
 let exportCsvBtn;
@@ -17,6 +17,7 @@ let activityChart = null;
 let statusPieChart = null;
 let locationChart = null;
 let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
+let paymentHistoryTable, paymentHistoryBody;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
@@ -36,6 +37,7 @@ function initDashboard() {
     editModal = document.getElementById('edit-modal');
     editForm = document.getElementById('edit-form');
     editUserNameInput = document.getElementById('edit-user-name');
+    editUserPhoneInput = document.getElementById('edit-user-phone');
     editUserRoleInput = document.getElementById('edit-user-role');
     editUserDeptInput = document.getElementById('edit-user-dept');
     editUserActiveInput = document.getElementById('edit-user-active');
@@ -49,6 +51,8 @@ function initDashboard() {
     paymentPhoneInput = document.getElementById('mpesa-phone');
     paymentAmountInput = document.getElementById('mpesa-amount');
     paymentStatusMsg = document.getElementById('payment-status-msg');
+    paymentHistoryTable = document.getElementById('payment-history-table');
+    paymentHistoryBody = document.getElementById('payment-history-body');
     
     // Nav switching
     const navItems = document.querySelectorAll('.nav-item');
@@ -76,6 +80,7 @@ function initDashboard() {
             } else if (target.includes('payment')) {
                 if (paymentSection) paymentSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'M-Pesa Payments';
+                fetchAndRenderPayments();
             } else {
                 liveMonitorSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'Live Activity Feed';
@@ -218,6 +223,7 @@ function renderUserTable() {
         row.innerHTML = `
             <td>${user.id}</td>
             <td>${user.name}</td>
+            <td>${user.phone || '-'}</td>
             <td style="text-transform: capitalize;">${user.role || 'N/A'}</td>
             <td>${user.department || 'N/A'}</td>
             <td>${user.uid || 'No UID'}</td>
@@ -399,6 +405,7 @@ function renderLogsTable() {
             <td style="text-transform: capitalize;">${log.role || 'N/A'}</td>
             <td>${log.department || 'N/A'}</td>
             <td style="font-family: monospace;">${log.tagUid || log.tagUID || 'N/A'}</td>
+            <td>${log.phone || '-'}</td>
             <td style="text-transform: capitalize;">${log.eventType || 'N/A'}</td>
             <td>${log.location || 'Unknown'}</td>
             <td>${log.readerId || 'N/A'}</td>
@@ -416,6 +423,7 @@ function editUser(userId) {
     
     currentEditUserId = userId;
     if (editUserNameInput) editUserNameInput.value = user.name;
+    if (editUserPhoneInput) editUserPhoneInput.value = user.phone || '';
     if (editUserRoleInput) editUserRoleInput.value = user.role || 'student';
     if (editUserDeptInput) editUserDeptInput.value = user.department || '';
     if (editUserActiveInput) editUserActiveInput.checked = user.active !== false; // Default to true if undefined
@@ -433,12 +441,14 @@ function handleEditSubmit(e) {
     if (!currentEditUserId) return;
     
     const newName = editUserNameInput.value;
+    const newPhone = editUserPhoneInput ? editUserPhoneInput.value : undefined;
     const newRole = editUserRoleInput ? editUserRoleInput.value : undefined;
     const newDept = editUserDeptInput ? editUserDeptInput.value : undefined;
     const newActive = editUserActiveInput ? editUserActiveInput.checked : undefined;
 
     if (newName && newName.trim() !== "") {
         const payload = { name: newName.trim() };
+        if (newPhone !== undefined) payload.phone = newPhone.trim();
         if (newRole !== undefined) payload.role = newRole;
         if (newDept !== undefined) payload.department = newDept.trim();
         if (newActive !== undefined) payload.active = newActive;
@@ -490,7 +500,7 @@ function exportLogsToCSV() {
     }
 
     // Define CSV Headers
-    const headers = ["Status", "User", "Role", "Department", "Tag UID", "Event Type", "Location", "Reader ID", "Time"];
+    const headers = ["Status", "User", "Role", "Department", "Tag UID", "Phone", "Event Type", "Location", "Reader ID", "Time"];
     const csvRows = [headers.join(',')];
 
     // Map data to CSV rows
@@ -511,6 +521,7 @@ function exportLogsToCSV() {
             `"${log.role || 'N/A'}"`,
             `"${log.department || 'N/A'}"`,
             `"${uid}"`,
+            `"${log.phone || '-'}"`,
             `"${log.eventType || 'N/A'}"`,
             `"${log.location || 'Unknown'}"`,
             `"${log.readerId || 'N/A'}"`,
@@ -672,6 +683,11 @@ async function handlePaymentSubmit(e) {
         return;
     }
 
+    const submitBtn = paymentForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Processing...';
+
     showPaymentStatus('Initiating M-Pesa prompt... please check your phone.', 'info');
 
     try {
@@ -701,6 +717,9 @@ async function handlePaymentSubmit(e) {
     } catch (err) {
         console.error('Payment initiation error:', err);
         showPaymentStatus(`Error: ${err.message}`, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
     }
 }
 
@@ -712,6 +731,82 @@ function showPaymentStatus(message, type) {
     if (type === 'error') paymentStatusMsg.style.color = '#ef4444';
     else if (type === 'success') paymentStatusMsg.style.color = '#22c55e';
     else paymentStatusMsg.style.color = '#3b82f6';
+}
+
+// --- Payment History Functions ---
+
+let allPaymentsData = [];
+
+function fetchAndRenderPayments() {
+    if (paymentHistoryBody) {
+        paymentHistoryBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #6b7280; font-weight: bold;">⏳ Loading payment history...</td></tr>';
+    }
+    
+    fetch(`${API_BASE_URL}/api/payments`)
+        .then(res => res.json())
+        .then(response => {
+            if (response.success && response.data) {
+                allPaymentsData = Array.isArray(response.data) ? response.data : Object.values(response.data);
+                renderPaymentHistory();
+            } else {
+                throw new Error(response.error || 'Unexpected response');
+            }
+        })
+        .catch(err => {
+            allPaymentsData = [];
+            if (paymentHistoryBody) {
+                paymentHistoryBody.innerHTML = '<tr><td colspan="6">Failed to load payments</td></tr>';
+            }
+            console.error('Error fetching payments:', err);
+        });
+}
+
+function renderPaymentHistory() {
+    if (!paymentHistoryBody) return;
+    
+    paymentHistoryBody.innerHTML = '';
+    
+    if (allPaymentsData.length === 0) {
+        paymentHistoryBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No payments found</td></tr>';
+        return;
+    }
+    
+    // Calculate totals
+    const totalAmount = allPaymentsData
+        .filter(p => p.status === 'completed')
+        .reduce((sum, p) => sum + (parseInt(p.amount) || 0), 0);
+    
+    const completedCount = allPaymentsData.filter(p => p.status === 'completed').length;
+    const failedCount = allPaymentsData.filter(p => p.status === 'failed').length;
+    
+    // Update summary cards if they exist
+    const totalElement = document.getElementById('payment-total-amount');
+    const completedElement = document.getElementById('payment-completed-count');
+    const failedElement = document.getElementById('payment-failed-count');
+    
+    if (totalElement) totalElement.textContent = `KES ${totalAmount.toLocaleString()}`;
+    if (completedElement) completedElement.textContent = completedCount;
+    if (failedElement) failedElement.textContent = failedCount;
+    
+    allPaymentsData.forEach(payment => {
+        const row = document.createElement('tr');
+        const isCompleted = payment.status === 'completed';
+        const statusClass = isCompleted ? 'text-green-600' : 'text-red-600';
+        const statusText = isCompleted ? 'Completed' : 'Failed';
+        
+        // Format date
+        const date = payment.createdAt ? new Date(payment.createdAt).toLocaleString() : payment.transactionDate || '-';
+        
+        row.innerHTML = `
+            <td>${payment.transactionId || '-'}</td>
+            <td>${payment.phone || '-'}</td>
+            <td>KES ${payment.amount || 0}</td>
+            <td class="${statusClass}">${statusText}</td>
+            <td>${payment.accountReference || 'NFC-Payment'}</td>
+            <td>${date}</td>
+        `;
+        paymentHistoryBody.appendChild(row);
+    });
 }
 
 // Export functions to window for browser console testing

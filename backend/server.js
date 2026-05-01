@@ -72,7 +72,7 @@ app.get('/api/users/:userId', async (req, res) => {
  */
 app.post('/api/users', async (req, res) => {
   try {
-    const { userId, email, name, role, department, uid } = req.body;
+    const { userId, email, name, phone, role, department, uid } = req.body;
     
     if (!userId || !name) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -89,6 +89,7 @@ app.post('/api/users', async (req, res) => {
     const result = await databaseHandler.createUser(userId, {
       email: email || '',
       name,
+      phone: phone || '',
       uid: uid || '',
       role: role || 'user',
       department: department || '',
@@ -244,6 +245,37 @@ app.get('/api/users/:userId/access-logs', async (req, res) => {
 
 // ===== M-PESA PAYMENT ENDPOINTS =====
 
+/**
+ * GET /api/payments - Get all payments
+ */
+app.get('/api/payments', async (req, res) => {
+  try {
+    const limit = req.query.limit || 50;
+    const payments = await databaseHandler.getAllPayments(parseInt(limit));
+    res.json({ success: true, data: payments });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/payments/:transactionId - Get specific payment
+ */
+app.get('/api/payments/:transactionId', async (req, res) => {
+  try {
+    const payment = await databaseHandler.getPayment(req.params.transactionId);
+    if (payment) {
+      res.json({ success: true, data: payment });
+    } else {
+      res.status(404).json({ success: false, error: 'Payment not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===== M-PESA STK PUSH ENDPOINTS =====
+
 // --- M-Pesa Configuration ---
 const BUSINESS_SHORT_CODE = process.env.MPESA_SHORTCODE || "174379";
 const PASSKEY = process.env.MPESA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
@@ -322,15 +354,118 @@ app.post('/api/mpesa/pay', async (req, res) => {
     }
 });
 
+// Trigger Payment via Tag Route
+app.post('/api/mpesa/pay-via-tag', async (req, res) => {
+    const { tagUID, amount } = req.body;
+
+    if (!tagUID || !amount) return res.status(400).json({ success: false, error: "Missing tagUID or amount" });
+
+    const parsedAmount = parseInt(amount, 10);
+
+    try {
+        // 1. Get Tag
+        const tag = await databaseHandler.getNFCTag(tagUID);
+        if (!tag) return res.status(404).json({ success: false, error: "NFC Tag not registered." });
+
+        // 2. Get User
+        const user = await databaseHandler.getUser(tag.userId);
+        if (!user || !user.phone) return res.status(404).json({ success: false, error: "User or phone number not found." });
+
+        const phone = user.phone;
+        if (!/^254\d{9}$/.test(phone)) return res.status(400).json({ success: false, error: `Invalid user phone format (${phone}). Must be 254XXXXXXXXX.` });
+
+        const token = await getAuthToken();
+        const timestamp = getTimestamp();
+        const password = generatePassword(BUSINESS_SHORT_CODE, PASSKEY, timestamp);
+
+        const payload = {
+            BusinessShortCode: BUSINESS_SHORT_CODE,
+            Password: password,
+            Timestamp: timestamp,
+            TransactionType: "CustomerPayBillOnline", 
+            Amount: parsedAmount,
+            PartyA: phone, 
+            PartyB: BUSINESS_SHORT_CODE, 
+            PhoneNumber: phone, 
+            CallBackURL: `https://nfc-access-system-1.onrender.com/api/mpesa/callback`,
+            AccountReference: "NFC-Payment", 
+            TransactionDesc: "Payment via NFC Tag",
+        };
+
+        const response = await axios.post(DARASA_STK_PUSH_URL, payload, {
+            headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        console.log("M-Pesa STK Push initiated successfully via Tag:", response.data);
+        res.status(200).json({ success: true, data: response.data, phone });
+    } catch (error) {
+        console.error("Error initiating M-Pesa payment via Tag:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Safaricom Callback Route
-app.post('/api/mpesa/callback', (req, res) => {
+app.post('/api/mpesa/callback', async (req, res) => {
     console.log("Received M-Pesa callback:", JSON.stringify(req.body, null, 2));
     
-    if (req.body?.Body?.stkCallback?.ResultCode === 0) {
+    const stkCallback = req.body?.Body?.stkCallback;
+    
+    if (stkCallback?.ResultCode === 0) {
         console.log("Payment successful!");
-        // TODO: Later, we can add logic here to update Firestore using your databaseHandler
+        
+        // Extract payment details from callback
+        const callbackMetadata = stkCallback.CallbackMetadata;
+        let paymentRecord = {
+            status: 'completed',
+            amount: 0,
+            phone: '',
+            transactionId: '',
+            transactionDate: '',
+            accountReference: stkCallback.AccountReference || 'NFC-Payment'
+        };
+        
+        // Parse metadata items
+        if (callbackMetadata?.Item) {
+            callbackMetadata.Item.forEach(item => {
+                switch (item.Name) {
+                    case 'Amount':
+                        paymentRecord.amount = item.Value;
+                        break;
+                    case 'MpesaReceiptNumber':
+                        paymentRecord.transactionId = item.Value;
+                        break;
+                    case 'PhoneNumber':
+                        paymentRecord.phone = String(item.Value);
+                        break;
+                    case 'TransactionDate':
+                        paymentRecord.transactionDate = String(item.Value);
+                        break;
+                }
+            });
+        }
+        
+        // Save to Firebase
+        try {
+            await databaseHandler.savePayment(paymentRecord);
+            console.log("Payment record saved to Firestore");
+        } catch (err) {
+            console.error("Error saving payment to Firestore:", err);
+        }
     } else {
         console.log("Payment failed or cancelled by user.");
+        
+        // Save failed payment record
+        try {
+            await databaseHandler.savePayment({
+                status: 'failed',
+                resultCode: stkCallback?.ResultCode,
+                resultDesc: stkCallback?.ResultDesc,
+                accountReference: stkCallback?.AccountReference || 'NFC-Payment',
+                phone: stkCallback?.PhoneNumber || ''
+            });
+        } catch (err) {
+            console.error("Error saving failed payment:", err);
+        }
     }
 
     // Always acknowledge receipt to Safaricom

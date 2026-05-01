@@ -104,6 +104,10 @@
       <input type="text" id="f-name" placeholder="e.g. Alice Mwangi"/>
     </div>
     <div>
+      <label>Phone Number</label>
+      <input type="tel" id="f-phone" placeholder="e.g. 254700000000"/>
+    </div>
+    <div>
       <label>Email</label>
       <input type="email" id="f-email" placeholder="e.g. alice@example.com"/>
     </div>
@@ -293,6 +297,7 @@ function stopListening() {
 
 window.saveUser = async function() {
   const name  = document.getElementById("f-name").value.trim();
+  const phone = document.getElementById("f-phone").value.trim();
   const email = document.getElementById("f-email").value.trim();
   const role  = document.getElementById("f-role").value;
   const dept  = document.getElementById("f-dept").value.trim();
@@ -316,6 +321,7 @@ window.saveUser = async function() {
         body: JSON.stringify({ 
             userId: userId, 
             name: name, 
+            phone: phone,
             email: email, 
             role: role, 
             department: dept,
