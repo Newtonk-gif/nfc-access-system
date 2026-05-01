@@ -88,7 +88,7 @@ function initDashboard() {
                 startNfcScanBtn.disabled = false;
             }
         if (cancelNfcScanBtn) {
-            cancelNfcScanBtn.style.display = 'none';
+            cancelNfcScanBtn.disabled = true;
         }
 
             if (target.includes('user')) {
@@ -186,7 +186,7 @@ function initDashboard() {
                         startNfcScanBtn.disabled = false;
                     }
                 if (cancelNfcScanBtn) {
-                    cancelNfcScanBtn.style.display = 'none';
+                    cancelNfcScanBtn.disabled = true;
                 }
                     showTagPaymentStatus('Tag detected. Enter amount and submit.', 'success');
                 }
@@ -939,7 +939,7 @@ function startNfcScan() {
         startNfcScanBtn.disabled = true;
     }
     if (cancelNfcScanBtn) {
-        cancelNfcScanBtn.style.display = 'block';
+        cancelNfcScanBtn.disabled = false;
     }
     showTagPaymentStatus('Please tap the NFC card on the reader now.', 'info');
 }
@@ -951,7 +951,7 @@ function cancelNfcScan() {
         startNfcScanBtn.disabled = false;
     }
     if (cancelNfcScanBtn) {
-        cancelNfcScanBtn.style.display = 'none';
+        cancelNfcScanBtn.disabled = true;
     }
     showTagPaymentStatus('Scan cancelled.', 'error');
 }
