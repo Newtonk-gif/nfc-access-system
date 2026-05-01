@@ -160,6 +160,9 @@ function initDashboard() {
     if (startNfcScanBtn) {
         startNfcScanBtn.addEventListener('click', startNfcScan);
     }
+    if (cancelNfcScanBtn) {
+        cancelNfcScanBtn.addEventListener('click', cancelNfcScan);
+    }
 
     // Load access logs initially to display existing scan history
     fetchAndRenderLogs();
@@ -866,6 +869,7 @@ function startNfcScan() {
 
 function cancelNfcScan() {
     isListeningForPayment = false;
+    if (paymentTagUidInput) paymentTagUidInput.value = '';
     if (startNfcScanBtn) {
         startNfcScanBtn.textContent = 'Start Scan';
         startNfcScanBtn.disabled = false;
