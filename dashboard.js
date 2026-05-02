@@ -23,6 +23,10 @@ let cancelNfcScanBtn;
 let isListeningForPayment = false;
 let nfcScanTimeout;
 let nfcCountdownInterval;
+let manualPaymentAbortController = null;
+let tagPaymentAbortController = null;
+let cancelManualPaymentBtn;
+let cancelTagPaymentBtn;
 
 // Backend API URL (Replace with your actual live Render URL, e.g., 'https://nfc-backend-abcd.onrender.com')
 const API_BASE_URL = 'https://nfc-access-system-1.onrender.com'; // 👈 Paste your actual Render URL here
@@ -63,6 +67,8 @@ function initDashboard() {
     paymentTagStatusMsg = document.getElementById('payment-tag-status-msg');
     startNfcScanBtn = document.getElementById('start-nfc-scan-btn');
     cancelNfcScanBtn = document.getElementById('cancel-nfc-scan-btn');
+    cancelManualPaymentBtn = document.getElementById('cancel-manual-payment-btn');
+    cancelTagPaymentBtn = document.getElementById('cancel-tag-payment-btn');
     
     // Nav switching
     const navItems = document.querySelectorAll('.nav-item');
@@ -166,6 +172,20 @@ function initDashboard() {
     }
     if (cancelNfcScanBtn) {
         cancelNfcScanBtn.addEventListener('click', cancelNfcScan);
+    }
+    if (cancelManualPaymentBtn) {
+        cancelManualPaymentBtn.addEventListener('click', () => {
+            if (manualPaymentAbortController) {
+                manualPaymentAbortController.abort();
+            }
+        });
+    }
+    if (cancelTagPaymentBtn) {
+        cancelTagPaymentBtn.addEventListener('click', () => {
+            if (tagPaymentAbortController) {
+                tagPaymentAbortController.abort();
+            }
+        });
     }
 
     // Load access logs initially to display existing scan history
@@ -740,13 +760,18 @@ async function handlePaymentSubmit(e) {
     submitBtn.disabled = true;
     submitBtn.textContent = '⏳ Processing...';
 
+    if (cancelManualPaymentBtn) cancelManualPaymentBtn.style.display = 'block';
+    manualPaymentAbortController = new AbortController();
+    const signal = manualPaymentAbortController.signal;
+
     showPaymentStatus('Initiating M-Pesa prompt... please check your phone.', 'info');
 
     try {
         const response = await fetch(MPESA_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, amount })
+            body: JSON.stringify({ phone, amount }),
+            signal
         });
 
         // Catch 404s, 500s, or CORS errors before attempting to parse JSON
@@ -767,11 +792,17 @@ async function handlePaymentSubmit(e) {
             showPaymentStatus(`Failed: ${data.error || 'Unknown error occurred'}`, 'error');
         }
     } catch (err) {
-        console.error('Payment initiation error:', err);
-        showPaymentStatus(`Error: ${err.message}`, 'error');
+        if (err.name === 'AbortError') {
+            showPaymentStatus('Payment processing cancelled.', 'error');
+        } else {
+            console.error('Payment initiation error:', err);
+            showPaymentStatus(`Error: ${err.message}`, 'error');
+        }
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalBtnText;
+        if (cancelManualPaymentBtn) cancelManualPaymentBtn.style.display = 'none';
+        manualPaymentAbortController = null;
     }
 }
 
@@ -808,13 +839,20 @@ async function handleTagPaymentSubmit(e) {
     submitBtn.disabled = true;
     submitBtn.textContent = '⏳ Processing...';
 
+    if (cancelTagPaymentBtn) {
+        cancelTagPaymentBtn.disabled = false;
+    }
+    tagPaymentAbortController = new AbortController();
+    const signal = tagPaymentAbortController.signal;
+
     showTagPaymentStatus('Looking up user and initiating M-Pesa...', 'info');
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/mpesa/pay-via-tag`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tagUID, amount })
+            body: JSON.stringify({ tagUID, amount }),
+            signal
         });
 
         if (!response.ok) {
@@ -842,11 +880,17 @@ async function handleTagPaymentSubmit(e) {
             showTagPaymentStatus(`Failed: ${data.error || 'Unknown error occurred'}`, 'error');
         }
     } catch (err) {
-        console.error('Tag Payment error:', err);
-        showTagPaymentStatus(`Error: ${err.message}`, 'error');
+        if (err.name === 'AbortError') {
+            showTagPaymentStatus('Payment processing cancelled.', 'error');
+        } else {
+            console.error('Tag Payment error:', err);
+            showTagPaymentStatus(`Error: ${err.message}`, 'error');
+        }
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalBtnText;
+        if (cancelTagPaymentBtn) cancelTagPaymentBtn.disabled = true;
+        tagPaymentAbortController = null;
     }
 }
 

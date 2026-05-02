@@ -347,7 +347,15 @@ app.post('/api/mpesa/pay', async (req, res) => {
     if (!amount || !phone) return res.status(400).json({ success: false, error: "Missing amount or phone" });
 
     const parsedAmount = parseInt(amount, 10);
-    if (!/^254\d{9}$/.test(phone)) return res.status(400).json({ success: false, error: "Invalid phone format. Use 254XXXXXXXXX." });
+
+    // Auto-format the phone number to 254XXXXXXXXX
+    let formattedPhone = phone.replace(/\D/g, ''); // Remove spaces, +, etc.
+    if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
+    if (formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) formattedPhone = '254' + formattedPhone;
+
+    if (!/^254\d{9}$/.test(formattedPhone)) {
+        return res.status(400).json({ success: false, error: `Invalid phone format (${formattedPhone}). Must be exactly 12 digits.` });
+    }
 
     try {
         const token = await getAuthToken();
@@ -360,9 +368,9 @@ app.post('/api/mpesa/pay', async (req, res) => {
             Timestamp: timestamp,
             TransactionType: "CustomerPayBillOnline", 
             Amount: parsedAmount,
-            PartyA: phone, 
+            PartyA: formattedPhone, 
             PartyB: BUSINESS_SHORT_CODE, 
-            PhoneNumber: phone, 
+            PhoneNumber: formattedPhone, 
             CallBackURL: `https://nfc-access-system-1.onrender.com/api/mpesa/callback`, // Safaricom will call this Render URL
             AccountReference: "NFC-Payment", 
             TransactionDesc: "Payment for NFC service",
@@ -397,8 +405,14 @@ app.post('/api/mpesa/pay-via-tag', async (req, res) => {
         const user = await databaseHandler.getUser(tag.userId);
         if (!user || !user.phone) return res.status(404).json({ success: false, error: "User or phone number not found." });
 
-        const phone = user.phone;
-        if (!/^254\d{9}$/.test(phone)) return res.status(400).json({ success: false, error: `Invalid user phone format (${phone}). Must be 254XXXXXXXXX.` });
+        // Auto-format the phone number to 254XXXXXXXXX
+        let formattedPhone = user.phone.replace(/\D/g, ''); // Remove spaces, +, etc.
+        if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
+        if (formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) formattedPhone = '254' + formattedPhone;
+
+        if (!/^254\d{9}$/.test(formattedPhone)) {
+            return res.status(400).json({ success: false, error: `Invalid user phone format (${formattedPhone}). Must be exactly 12 digits.` });
+        }
 
         const token = await getAuthToken();
         const timestamp = getTimestamp();
@@ -410,9 +424,9 @@ app.post('/api/mpesa/pay-via-tag', async (req, res) => {
             Timestamp: timestamp,
             TransactionType: "CustomerPayBillOnline", 
             Amount: parsedAmount,
-            PartyA: phone, 
+            PartyA: formattedPhone, 
             PartyB: BUSINESS_SHORT_CODE, 
-            PhoneNumber: phone, 
+            PhoneNumber: formattedPhone, 
             CallBackURL: `https://nfc-access-system-1.onrender.com/api/mpesa/callback`,
             AccountReference: "NFC-Payment", 
             TransactionDesc: "Payment via NFC Tag",
@@ -423,7 +437,7 @@ app.post('/api/mpesa/pay-via-tag', async (req, res) => {
         });
 
         console.log("M-Pesa STK Push initiated successfully via Tag:", response.data);
-        res.status(200).json({ success: true, data: response.data, phone });
+        res.status(200).json({ success: true, data: response.data, phone: formattedPhone });
     } catch (error) {
         console.error("Error initiating M-Pesa payment via Tag:", error.message);
         res.status(500).json({ success: false, error: error.message });

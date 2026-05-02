@@ -192,7 +192,10 @@
                                 <label for="mpesa-amount">Amount (KES)</label>
                                 <input type="number" id="mpesa-amount" placeholder="100" required min="1">
                             </div>
-                            <button type="submit" class="primary-btn" style="width: 100%; background-color: #22c55e; border-color: #16a34a; padding: 14px; font-size: 16px;">Trigger STK Push</button>
+                            <div style="display: flex; gap: 10px; width: 100%;">
+                                <button type="submit" class="primary-btn" style="flex: 1; background-color: #22c55e; border-color: #16a34a; padding: 14px; font-size: 16px;">Trigger STK Push</button>
+                                <button type="button" id="cancel-manual-payment-btn" class="cancel-btn" style="display: none; padding: 14px; font-size: 16px;">Cancel</button>
+                            </div>
                         </form>
                         <p id="payment-status-msg" style="margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold;"></p>
                     </div>
@@ -213,7 +216,10 @@
                                 <label for="mpesa-tag-amount">Amount (KES)</label>
                                 <input type="number" id="mpesa-tag-amount" placeholder="100" required min="1">
                             </div>
-                            <button type="submit" class="primary-btn" style="width: 100%; background-color: #3b82f6; border-color: #2563eb; padding: 14px; font-size: 16px;">Pay with Tag</button>
+                            <div style="display: flex; gap: 10px; width: 100%;">
+                                <button type="submit" class="primary-btn" style="flex: 1; background-color: #3b82f6; border-color: #2563eb; padding: 14px; font-size: 16px;">Pay with Tag</button>
+                                <button type="button" id="cancel-tag-payment-btn" class="cancel-btn" style="padding: 14px; font-size: 16px;" disabled>Cancel</button>
+                            </div>
                         </form>
                         <p id="payment-tag-status-msg" style="margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold;"></p>
                     </div>
