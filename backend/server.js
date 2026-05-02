@@ -403,10 +403,11 @@ app.post('/api/mpesa/pay-via-tag', async (req, res) => {
 
         // 2. Get User
         const user = await databaseHandler.getUser(tag.userId);
-        if (!user || !user.phone) return res.status(404).json({ success: false, error: "User or phone number not found." });
+        const userPhone = user ? (user.phone || user.phoneNumber || '') : '';
+        if (!user || !userPhone) return res.status(404).json({ success: false, error: "User or phone number not found." });
 
         // Auto-format the phone number to 254XXXXXXXXX
-        let formattedPhone = user.phone.replace(/\D/g, ''); // Remove spaces, +, etc.
+        let formattedPhone = userPhone.replace(/\D/g, ''); // Remove spaces, +, etc.
         if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1);
         if (formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) formattedPhone = '254' + formattedPhone;
 

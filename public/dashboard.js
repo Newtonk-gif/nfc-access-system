@@ -19,6 +19,8 @@ let locationChart = null;
 let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
 let paymentTagForm, paymentTagUidInput, paymentTagAmountInput, paymentTagStatusMsg;
 let paymentHistoryTable, paymentHistoryBody;
+let allPaymentsData = [];
+let paymentRefreshInterval = null;
 let paymentReaderSelect;
 let startNfcScanBtn;
 let cancelNfcScanBtn;
@@ -99,9 +101,13 @@ function initDashboard() {
                 startNfcScanBtn.textContent = 'Start Scan';
                 startNfcScanBtn.disabled = false;
             }
-        if (cancelNfcScanBtn) {
-            cancelNfcScanBtn.disabled = true;
-        }
+            if (cancelNfcScanBtn) {
+                cancelNfcScanBtn.disabled = true;
+            }
+            if (paymentRefreshInterval) {
+                clearInterval(paymentRefreshInterval);
+                paymentRefreshInterval = null;
+            }
 
             if (target.includes('user')) {
                 userManagementSection.classList.remove('hidden');
@@ -111,9 +117,16 @@ function initDashboard() {
                 if (enrollmentSection) enrollmentSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'Enrollment Console';
             } else if (target.includes('payment')) {
-                if (paymentSection) paymentSection.classList.remove('hidden');
+                if (paymentSection) {
+                    paymentSection.classList.remove('hidden');
+                    fetchAndRenderPayments();
+                    paymentRefreshInterval = setInterval(() => {
+                        if (paymentSection && !paymentSection.classList.contains('hidden')) {
+                            fetchAndRenderPayments();
+                        }
+                    }, 15000);
+                }
                 document.getElementById('dashboard-title').textContent = 'M-Pesa Payments';
-                fetchAndRenderPayments();
             } else {
                 liveMonitorSection.classList.remove('hidden');
                 document.getElementById('dashboard-title').textContent = 'Live Activity Feed';
@@ -604,7 +617,7 @@ function exportLogsToCSV() {
             `"${log.role || 'N/A'}"`,
             `"${log.department || 'N/A'}"`,
             `"${uid}"`,
-            `"${log.phone || '-'}"`,
+            `"${log.phone || log.phoneNumber || '-'}"`,
             `"${log.eventType || 'N/A'}"`,
             `"${log.location || 'Unknown'}"`,
             `"${log.readerId || 'N/A'}"`,
