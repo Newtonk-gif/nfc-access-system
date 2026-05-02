@@ -30,6 +30,11 @@ databaseHandler.listenToAccessLogs((newLog) => {
     io.emit('new_access_log', newLog);
 });
 
+// Listen for payment scans from RTDB and emit to dashboard
+databaseHandler.listenToPaymentSession((session) => {
+    io.emit('payment_scan_result', session);
+});
+
 // Middleware
 app.use(cors({
     origin: '*',
@@ -272,6 +277,27 @@ app.get('/api/payments/:transactionId', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// Trigger Payment Scan Session (Hardware Integration)
+app.post('/api/payments/start-scan', async (req, res) => {
+    try {
+        const { readerId } = req.body;
+        await databaseHandler.startPaymentSession(readerId);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Cancel Payment Scan Session
+app.post('/api/payments/cancel-scan', async (req, res) => {
+    try {
+        await databaseHandler.cancelPaymentSession();
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // ===== M-PESA STK PUSH ENDPOINTS =====

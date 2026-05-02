@@ -402,6 +402,55 @@ class DatabaseHandler {
     }
   }
 
+  // ===== PAYMENT SESSION (HARDWARE INTEGRATION) =====
+
+  /**
+   * Tell the NFC reader to start listening for a payment tap
+   */
+  async startPaymentSession(readerId) {
+    try {
+      await db.ref('payments-session').set({
+        status: 'awaiting_scan',
+        readerId: readerId || 'ALL',
+        timestamp: Date.now()
+      });
+      console.log(`Payment session started for reader: ${readerId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Error starting payment session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel the payment listening session
+   */
+  async cancelPaymentSession() {
+    try {
+      await db.ref('payments-session').set({
+        status: 'idle',
+        timestamp: Date.now()
+      });
+      console.log('Payment session cancelled');
+      return { success: true };
+    } catch (error) {
+      console.error('Error canceling payment session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Listen for scan results from the hardware
+   */
+  listenToPaymentSession(callback) {
+    db.ref('payments-session').on('value', (snapshot) => {
+      const val = snapshot.val();
+      if (val && val.status === 'scanned') {
+        callback(val);
+      }
+    });
+  }
+
   // ===== SYSTEM STATUS =====
 
   /**

@@ -19,6 +19,7 @@ let locationChart = null;
 let paymentForm, paymentPhoneInput, paymentAmountInput, paymentStatusMsg;
 let paymentTagForm, paymentTagUidInput, paymentTagAmountInput, paymentTagStatusMsg;
 let paymentHistoryTable, paymentHistoryBody;
+let paymentReaderSelect;
 let startNfcScanBtn;
 let cancelNfcScanBtn;
 let isListeningForPayment = false;
@@ -64,6 +65,7 @@ function initDashboard() {
     paymentTagUidInput = document.getElementById('mpesa-tag-uid');
     paymentTagAmountInput = document.getElementById('mpesa-tag-amount');
     paymentTagStatusMsg = document.getElementById('payment-tag-status-msg');
+    paymentReaderSelect = document.getElementById('payment-reader-select');
     startNfcScanBtn = document.getElementById('start-nfc-scan-btn');
     cancelNfcScanBtn = document.getElementById('cancel-nfc-scan-btn');
     
@@ -180,11 +182,13 @@ function initDashboard() {
     socket.on('new_access_log', (newLog) => {
         console.log("⚡ Real-time update received via WebSocket!");
         fetchAndRenderLogs(); // Instantly refresh the table
-        
-        // Auto-fill UID for tap-to-pay if payment section is active
+    });
+
+    socket.on('payment_scan_result', (session) => {
+        console.log("⚡ Payment hardware scan result received via WebSocket!");
         if (paymentSection && !paymentSection.classList.contains('hidden') && paymentTagUidInput) {
             if (isListeningForPayment) {
-                const uid = newLog.tagUID || newLog.tagUid;
+                const uid = session.uid || session.tagUID;
                 if (uid) {
                     paymentTagUidInput.value = uid;
                     isListeningForPayment = false;
@@ -194,10 +198,13 @@ function initDashboard() {
                         startNfcScanBtn.textContent = 'Start Scan';
                         startNfcScanBtn.disabled = false;
                     }
-                if (cancelNfcScanBtn) {
-                    cancelNfcScanBtn.disabled = true;
-                }
+                    if (cancelNfcScanBtn) {
+                        cancelNfcScanBtn.disabled = true;
+                    }
                     showTagPaymentStatus('Tag detected. Enter amount and submit.', 'success');
+                    
+                    // Reset the hardware session so it stops listening
+                    fetch(`${API_BASE_URL}/api/payments/cancel-scan`, { method: 'POST' }).catch(e => console.error(e));
                 }
             }
         }
@@ -954,6 +961,15 @@ function startNfcScan() {
     }
     
     let timeLeft = 30;
+
+    // Tell backend to initiate Firebase RTDB hardware listener
+    const readerId = paymentReaderSelect ? paymentReaderSelect.value : 'ALL';
+    fetch(`${API_BASE_URL}/api/payments/start-scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readerId })
+    }).catch(err => console.error('Failed to start hardware scan:', err));
+
     showTagPaymentStatus(`Please tap the NFC card on the reader now. (${timeLeft}s remaining)`, 'info');
 
     nfcCountdownInterval = setInterval(() => {
@@ -986,6 +1002,11 @@ function cancelNfcScan() {
         cancelNfcScanBtn.disabled = true;
     }
     showTagPaymentStatus('Scan cancelled.', 'error');
+
+    // Tell backend to cancel Firebase RTDB hardware listener
+    fetch(`${API_BASE_URL}/api/payments/cancel-scan`, {
+        method: 'POST'
+    }).catch(err => console.error('Failed to cancel hardware scan:', err));
 }
 
 // Export functions to window for browser console testing

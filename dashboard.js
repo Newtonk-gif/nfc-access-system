@@ -874,6 +874,15 @@ function startNfcScan() {
     }
     
     let timeLeft = 30;
+
+    // Tell backend to initiate Firebase RTDB hardware listener
+    const readerId = paymentReaderSelect ? paymentReaderSelect.value : 'ALL';
+    fetch(`${API_BASE_URL}/api/payments/start-scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readerId })
+    }).catch(err => console.error('Failed to start hardware scan:', err));
+
     showTagPaymentStatus(`Please tap the NFC card on the reader now. (${timeLeft}s remaining)`, 'info');
 
     nfcCountdownInterval = setInterval(() => {
@@ -906,6 +915,11 @@ function cancelNfcScan() {
         cancelNfcScanBtn.disabled = true;
     }
     showTagPaymentStatus('Scan cancelled.', 'error');
+
+    // Tell backend to cancel Firebase RTDB hardware listener
+    fetch(`${API_BASE_URL}/api/payments/cancel-scan`, {
+        method: 'POST'
+    }).catch(err => console.error('Failed to cancel hardware scan:', err));
 }
 
 // Export functions to window for browser console testing
