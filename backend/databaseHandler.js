@@ -409,7 +409,7 @@ class DatabaseHandler {
    */
   async startPaymentSession(readerId) {
     try {
-      await db.ref('payments-session').set({
+      await db.ref('payment_session').set({
         status: 'awaiting_scan',
         readerId: readerId || 'ALL',
         timestamp: Date.now()
@@ -427,7 +427,7 @@ class DatabaseHandler {
    */
   async cancelPaymentSession() {
     try {
-      await db.ref('payments-session').set({
+      await db.ref('payment_session').set({
         status: 'idle',
         timestamp: Date.now()
       });
@@ -443,7 +443,7 @@ class DatabaseHandler {
    * Listen for scan results from the hardware
    */
   listenToPaymentSession(callback) {
-    db.ref('payments-session').on('value', (snapshot) => {
+    db.ref('payment_session').on('value', (snapshot) => {
       const val = snapshot.val();
       if (val && val.status === 'scanned') {
         callback(val);
