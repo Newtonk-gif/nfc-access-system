@@ -488,7 +488,7 @@ function renderLogsTable() {
             <td style="text-transform: capitalize;">${log.role || 'N/A'}</td>
             <td>${log.department || 'N/A'}</td>
             <td style="font-family: monospace;">${log.tagUid || log.tagUID || 'N/A'}</td>
-            <td>${log.phone || '-'}</td>
+            <td>${log.phone || log.phoneNumber || '-'}</td>
             <td style="text-transform: capitalize;">${log.eventType || 'N/A'}</td>
             <td>${log.location || 'Unknown'}</td>
             <td>${log.readerId || 'N/A'}</td>

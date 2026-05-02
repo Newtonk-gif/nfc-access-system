@@ -218,7 +218,7 @@ class DatabaseHandler {
         const user = await this.getUser(tag.userId);
         if (user) {
           logEntry.userName = user.name || null;
-          logEntry.phone = user.phone || null;
+          logEntry.phone = user.phone || user.phoneNumber || null;
           logEntry.role = user.role || null;
           logEntry.department = user.department || null;
         }
