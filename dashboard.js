@@ -185,6 +185,12 @@ function initDashboard() {
             if (tagPaymentAbortController) {
                 tagPaymentAbortController.abort();
             }
+            if (isListeningForPayment) {
+                cancelNfcScan();
+            } else {
+                fetch(`${API_BASE_URL}/api/payments/cancel-scan`, { method: 'POST' })
+                    .catch(err => console.error('Failed to cancel hardware scan:', err));
+            }
         });
     }
 
