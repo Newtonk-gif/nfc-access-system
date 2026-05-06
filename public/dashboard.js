@@ -848,8 +848,6 @@ function showPaymentStatus(message, type) {
 
 // --- Payment History Functions ---
 
-let allPaymentsData = [];
-
 function fetchAndRenderPayments() {
     if (paymentHistoryBody) {
         paymentHistoryBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #6b7280; font-weight: bold;">⏳ Loading payment history...</td></tr>';
