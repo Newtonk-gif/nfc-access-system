@@ -329,6 +329,7 @@ table {
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    table-layout: auto;
 }
 
 th {
@@ -345,6 +346,8 @@ td {
     padding: 15px;
     border-bottom: 1px solid #f1f5f9;
     font-size: 14px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 /* --- Animations & Effects --- */

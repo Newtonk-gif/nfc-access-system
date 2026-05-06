@@ -506,7 +506,7 @@ function renderLogsTable() {
             <td>${userDisplay}</td>
             <td style="text-transform: capitalize;">${log.role || 'N/A'}</td>
             <td>${log.department || 'N/A'}</td>
-            <td style="font-family: monospace;">${log.tagUid || log.tagUID || 'N/A'}</td>
+            <td style="font-family: monospace; word-wrap: break-word; word-break: break-all; max-width: 120px;">${log.tagUid || log.tagUID || 'N/A'}</td>
             <td>${log.phone || log.phoneNumber || '-'}</td>
             <td style="text-transform: capitalize;">${log.eventType || 'N/A'}</td>
             <td>${log.location || 'Unknown'}</td>
