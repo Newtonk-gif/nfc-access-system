@@ -138,6 +138,8 @@ function initDashboard() {
     // Check if the backend server is running and update UI
     checkServerStatus();
     setInterval(checkServerStatus, 15000); // Re-check every 15 seconds
+    window.addEventListener('online', checkServerStatus);
+    window.addEventListener('offline', updateNetworkStatus);
     
     // Setup event listeners
     if (editForm) {
@@ -257,7 +259,12 @@ function checkServerStatus() {
     const statusIndicator = document.querySelector('.status-indicator');
     if (!statusIndicator) return;
 
-    fetch(`${API_BASE_URL}/health`)
+    if (!navigator.onLine) {
+        statusIndicator.innerHTML = '<span class="dot" style="background-color: #ef4444; animation: none;"></span> Browser Offline';
+        return;
+    }
+
+    fetch(`${API_BASE_URL}/health`, { cache: 'no-store' })
         .then(res => {
             if (res.ok) {
                 statusIndicator.innerHTML = '<span class="dot pulse" style="background-color: #22c55e;"></span> System Online';
@@ -266,8 +273,25 @@ function checkServerStatus() {
             }
         })
         .catch(err => {
-            statusIndicator.innerHTML = '<span class="dot" style="background-color: #ef4444; animation: none;"></span> Backend Offline';
+            const blockedByClient = err && err.message && err.message.toLowerCase().includes('blocked by client');
+            statusIndicator.innerHTML = blockedByClient
+                ? '<span class="dot" style="background-color: #f59e0b; animation: none;"></span> Health check blocked by browser'
+                : '<span class="dot" style="background-color: #ef4444; animation: none;"></span> Backend Offline';
+            if (blockedByClient) {
+                console.warn('Dashboard health check blocked by browser/client:', err);
+            }
         });
+}
+
+function updateNetworkStatus() {
+    const statusIndicator = document.querySelector('.status-indicator');
+    if (!statusIndicator) return;
+
+    if (navigator.onLine) {
+        statusIndicator.innerHTML = '<span class="dot pulse" style="background-color: #22c55e;"></span> System Online';
+    } else {
+        statusIndicator.innerHTML = '<span class="dot" style="background-color: #ef4444; animation: none;"></span> Browser Offline';
+    }
 }
 
 // Fetch users from API and render table
