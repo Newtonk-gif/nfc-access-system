@@ -227,9 +227,15 @@ app.post('/api/access-logs', async (req, res) => {
  */
 app.get('/api/access-logs', async (req, res) => {
   try {
-    const limit = req.query.limit || 50;
-    const logs = await databaseHandler.getAccessLogs(parseInt(limit));
-    res.json({ success: true, data: logs });
+    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+    const logsData = await databaseHandler.getAccessLogs(limit);
+    res.json({ 
+      success: true, 
+      data: logsData.items, 
+      totalCount: logsData.totalCount,
+      grantedTotal: logsData.grantedTotal,
+      deniedTotal: logsData.deniedTotal
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

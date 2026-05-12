@@ -246,15 +246,27 @@ class DatabaseHandler {
 
       if (snapshot.exists()) {
         let logsArray = Object.values(snapshot.val());
+        const totalCount = logsArray.length;
+        let grantedTotal = 0;
+        let deniedTotal = 0;
+        
+        logsArray.forEach(log => {
+          let isGranted = log.granted === true;
+          if (log.status) isGranted = log.status.toLowerCase() === 'granted';
+          if (isGranted) grantedTotal++;
+          else deniedTotal++;
+        });
+
         // Sort descending to show newest logs first
         logsArray.sort((a, b) => {
           const timeA = new Date(a.timestamp || 0).getTime();
           const timeB = new Date(b.timestamp || 0).getTime();
           return timeB - timeA;
         });
-        return logsArray.slice(0, limit);
+        
+        return { items: limit > 0 ? logsArray.slice(0, limit) : logsArray, totalCount, grantedTotal, deniedTotal };
       } else {
-        return [];
+        return { items: [], totalCount: 0, grantedTotal: 0, deniedTotal: 0 };
       }
     } catch (error) {
       console.error('Error fetching access logs:', error);

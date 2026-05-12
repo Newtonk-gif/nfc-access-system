@@ -13,6 +13,9 @@ let allLogsData = [];
 let currentUsersPage = 1;
 const usersPerPage = 10;
 let allUsersData = [];
+let trueTotalLogsCount = 0;
+let trueGrantedCount = -1;
+let trueDeniedCount = -1;
 let activityChart = null;
 let statusPieChart = null;
 let locationChart = null;
@@ -483,11 +486,17 @@ function fetchAndRenderLogs() {
             if (response.success && response.data) {
                 // Ensure data is an array before looping
                 allLogsData = Array.isArray(response.data) ? response.data : Object.values(response.data);
+                trueTotalLogsCount = response.totalCount !== undefined ? response.totalCount : allLogsData.length;
+                trueGrantedCount = response.grantedTotal !== undefined ? response.grantedTotal : -1;
+                trueDeniedCount = response.deniedTotal !== undefined ? response.deniedTotal : -1;
                 renderLogsTable();
                 updateAnalyticsChart();
             } else {
                 console.warn("Backend returned empty data or failed:", response);
                 allLogsData = [];
+                trueTotalLogsCount = 0;
+                trueGrantedCount = -1;
+                trueDeniedCount = -1;
                 renderLogsTable(); // Render empty state
                 updateAnalyticsChart();
             }
@@ -721,9 +730,14 @@ function updateAnalyticsChart() {
     const grantedScansEl = document.getElementById('granted-scans-count');
     const deniedScansEl = document.getElementById('denied-scans-count');
     
-    if (totalScansEl) totalScansEl.textContent = logsToProcess.length;
-    if (grantedScansEl) grantedScansEl.textContent = grantedCount;
-    if (deniedScansEl) deniedScansEl.textContent = deniedCount;
+    const isFiltered = (exportStartDate && exportStartDate.value) || (exportEndDate && exportEndDate.value);
+    const displayTotal = isFiltered ? logsToProcess.length : trueTotalLogsCount;
+    const displayGranted = (isFiltered || trueGrantedCount === -1) ? grantedCount : trueGrantedCount;
+    const displayDenied = (isFiltered || trueDeniedCount === -1) ? deniedCount : trueDeniedCount;
+    
+    if (totalScansEl) totalScansEl.textContent = displayTotal;
+    if (grantedScansEl) grantedScansEl.textContent = displayGranted;
+    if (deniedScansEl) deniedScansEl.textContent = displayDenied;
 
     // Prepare data for Chart.js (reverse to show chronological order left-to-right)
     const labels = Object.keys(countsByDate).reverse();
@@ -764,7 +778,7 @@ function updateAnalyticsChart() {
             data: {
                 labels: ['Granted', 'Denied'],
                 datasets: [{
-                    data: [grantedCount, deniedCount],
+                    data: [displayGranted, displayDenied],
                     backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)'],
                     borderColor: ['#16a34a', '#dc2626'],
                     borderWidth: 1
