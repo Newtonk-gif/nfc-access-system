@@ -519,13 +519,13 @@ app.get('/', (req, res) => {
     <div style="font-family: sans-serif; padding: 2rem; text-align: center; margin-top: 50px;">
       <h1 style="color: #16a34a;">✅ NFC Backend is Live!</h1>
       <p>The Node.js server is successfully running and connected to Firebase.</p>
-      <p>Health Check: <a href="/health">/health</a></p>
+      <p>Health Check: <a href="/api/status">/api/status</a></p>
     </div>
   `);
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint (renamed to bypass ad blockers)
+app.get('/api/status', (req, res) => {
   res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
 });
 
