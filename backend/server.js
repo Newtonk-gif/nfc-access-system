@@ -489,6 +489,7 @@ app.post('/api/mpesa/callback', async (req, res) => {
         try {
             await databaseHandler.savePayment(paymentRecord);
             console.log("Payment record saved to Firestore");
+            io.emit('payment_callback_result', paymentRecord);
         } catch (err) {
             console.error("Error saving payment to Firestore:", err);
         }
@@ -497,13 +498,15 @@ app.post('/api/mpesa/callback', async (req, res) => {
         
         // Save failed payment record
         try {
-            await databaseHandler.savePayment({
+            const failedRecord = {
                 status: 'failed',
                 resultCode: stkCallback?.ResultCode,
                 resultDesc: stkCallback?.ResultDesc,
                 accountReference: stkCallback?.AccountReference || 'NFC-Payment',
                 phone: stkCallback?.PhoneNumber || ''
-            });
+            };
+            await databaseHandler.savePayment(failedRecord);
+            io.emit('payment_callback_result', failedRecord);
         } catch (err) {
             console.error("Error saving failed payment:", err);
         }

@@ -251,6 +251,24 @@ function initDashboard() {
         }
     });
 
+    socket.on('payment_callback_result', (result) => {
+        console.log("⚡ Real-time M-Pesa callback received via WebSocket!", result);
+        
+        // Update the UI if the payment section is active
+        if (paymentSection && !paymentSection.classList.contains('hidden')) {
+            if (result.status === 'completed') {
+                showPaymentStatus(`✅ Payment Completed! KES ${result.amount} received.`, 'success');
+                showTagPaymentStatus(`✅ Payment Completed! KES ${result.amount} received.`, 'success');
+            } else {
+                showPaymentStatus(`❌ Payment Failed: ${result.resultDesc || 'Cancelled or timed out'}`, 'error');
+                showTagPaymentStatus(`❌ Payment Failed: ${result.resultDesc || 'Cancelled or timed out'}`, 'error');
+            }
+            
+            // Instantly refresh the payment history table
+            fetchAndRenderPayments();
+        }
+    });
+
     console.log("Dashboard event listeners initialized");
 }
 
