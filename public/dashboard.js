@@ -264,7 +264,7 @@ function checkServerStatus() {
         return;
     }
 
-    fetch(`${API_BASE_URL}/health`, { cache: 'no-store' })
+    fetch(`${API_BASE_URL}/api/status`, { cache: 'no-store' })
         .then(res => {
             if (res.ok) {
                 statusIndicator.innerHTML = '<span class="dot pulse" style="background-color: #22c55e;"></span> System Online';
