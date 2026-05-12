@@ -259,12 +259,24 @@ function initDashboard() {
         
         // Update the UI if the payment section is active
         if (paymentSection && !paymentSection.classList.contains('hidden')) {
+            const manualText = paymentStatusMsg ? paymentStatusMsg.textContent : '';
+            const tagText = paymentTagStatusMsg ? paymentTagStatusMsg.textContent : '';
+            
+            const isManualWaiting = manualText.includes('STK Push sent') || manualText.includes('Waiting');
+            const isTagWaiting = tagText.includes('STK Push sent') || tagText.includes('Waiting');
+
             if (result.status === 'completed') {
                 showPaymentStatus(`✅ Payment Completed! KES ${result.amount} received.`, 'success');
                 showTagPaymentStatus(`✅ Payment Completed! KES ${result.amount} received.`, 'success');
+                const msg = `✅ Payment Completed! KES ${result.amount} received.`;
+                if (isManualWaiting) showPaymentStatus(msg, 'success');
+                if (isTagWaiting) showTagPaymentStatus(msg, 'success');
             } else {
                 showPaymentStatus(`❌ Payment Failed: ${result.resultDesc || 'Cancelled or timed out'}`, 'error');
                 showTagPaymentStatus(`❌ Payment Failed: ${result.resultDesc || 'Cancelled or timed out'}`, 'error');
+                const msg = `❌ Payment Failed: ${result.resultDesc || 'Cancelled or timed out'}`;
+                if (isManualWaiting) showPaymentStatus(msg, 'error');
+                if (isTagWaiting) showTagPaymentStatus(msg, 'error');
             }
             
             // Instantly refresh the payment history table
@@ -731,9 +743,9 @@ function updateAnalyticsChart() {
     const deniedScansEl = document.getElementById('denied-scans-count');
     
     const isFiltered = (exportStartDate && exportStartDate.value) || (exportEndDate && exportEndDate.value);
-    const displayTotal = isFiltered ? logsToProcess.length : trueTotalLogsCount;
     const displayGranted = (isFiltered || trueGrantedCount === -1) ? grantedCount : trueGrantedCount;
     const displayDenied = (isFiltered || trueDeniedCount === -1) ? deniedCount : trueDeniedCount;
+    const displayTotal = displayGranted + displayDenied;
     
     if (totalScansEl) totalScansEl.textContent = displayTotal;
     if (grantedScansEl) grantedScansEl.textContent = displayGranted;
